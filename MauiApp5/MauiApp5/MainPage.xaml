@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp5.MainPage">
+
+    <VerticalStackLayout Padding="20" Spacing="20">
+        <!-- Botão para Iniciar o Espelhamento -->
+        <Button Text="Iniciar Espelhamento"
+                Clicked="StartButton_Clicked"
+                FontSize="20"
+                BackgroundColor="Green"
+                TextColor="White"
+                HorizontalOptions="Center"
+                VerticalOptions="Center" />
+
+        <!-- Botão para Parar o Espelhamento -->
+        <Button Text="Parar Espelhamento"
+                Clicked="StopButton_Clicked"
+                FontSize="20"
+                BackgroundColor="Red"
+                TextColor="White"
+                HorizontalOptions="Center"
+                VerticalOptions="Center" />
+
+        <!-- Exibição de Status -->
+        <Label x:Name="StatusLabel"
+               Text="Status: Aguardando Início"
+               FontSize="18"
+               HorizontalOptions="Center"
+               VerticalOptions="Center" />
+    </VerticalStackLayout>
+
+</ContentPage>

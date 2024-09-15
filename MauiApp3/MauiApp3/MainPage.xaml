@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp3.MainPage"
+              xmlns:local="clr-namespace:MauiApp3">
+
+     <StackLayout>
+        <Button Text="Start Capture" Clicked="StartButton_Clicked" />
+        <Button Text="Stop Capture" Clicked="StopButton_Clicked" />
+        <Label x:Name="StatusLabel" Text="Status: Parado" />
+        
+        <!-- Use o controle personalizado que integra o SurfaceView nativo -->
+        <local:CustomSurfaceView x:Name="SurfaceView" WidthRequest="400" HeightRequest="300" />
+    </StackLayout>
+
+</ContentPage>
