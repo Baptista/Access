@@ -1,4 +1,5 @@
 ﻿using System.Net.Sockets;
+using System.Text;
 
 namespace MauiApp4
 {
@@ -27,7 +28,7 @@ namespace MauiApp4
 
 				// Conectar ao servidor
 				_client = new TcpClient();
-				await _client.ConnectAsync("10.148.229.125", 5566); // Substitua pelo IP e porta do servidor
+				await _client.ConnectAsync("192.168.1.117", 5566); // Substitua pelo IP e porta do servidor
 
 				_networkStream = _client.GetStream();
 				_isConnected = true;
@@ -41,9 +42,69 @@ namespace MauiApp4
 				StatusLabel.Text = $"Erro ao conectar: {ex.Message}";
 			}
 		}
+        
+        private async void OnPanUpdated(object sender, PanUpdatedEventArgs e)
+        {
+            if (_networkStream != null && _networkStream.CanWrite)
+            {
+                try
+                {
+                    // Enviar evento MOVE (movimento do mouse/toque)
+                    string message = $"MOVE {e.TotalX} {e.TotalY}";
+                    byte[] data = Encoding.UTF8.GetBytes(message);
+                    await _networkStream.WriteAsync(data, 0, data.Length);
+                }
+                catch (Exception ex)
+                {
+                    StatusLabel.Text = $"Erro ao enviar comando: {ex.Message}";
+                }
+            }
+        }
 
-		// Receber e processar imagens do servidor
-		private async Task ReceiveImagesAsync()
+        // Capturar eventos de clique (tap) e enviar para o Android
+        private async void OnTapped(object sender, EventArgs e)
+        {
+            if (_networkStream != null && _networkStream.CanWrite)
+            {
+                try
+                {
+                    // Obter as coordenadas do toque em relação à imagem
+                    var image = (Image)sender;
+                    var touchPosition = GetTouchPosition(image, (TappedEventArgs)e);
+
+                    // Enviar a posição X e Y do clique
+                    string message = $"CLICK {touchPosition.X} {touchPosition.Y}";
+                    byte[] data = Encoding.UTF8.GetBytes(message);
+                    await _networkStream.WriteAsync(data, 0, data.Length);
+                }
+                catch (Exception ex)
+                {
+                    StatusLabel.Text = $"Erro ao enviar comando: {ex.Message}";
+                }
+            }
+        }
+
+        // Função para calcular a posição do toque em relação ao controle Image
+        private Point GetTouchPosition(Image image, TappedEventArgs e)
+        {
+            // Pegar as dimensões da Image
+            var imageWidth = image.Width;
+            var imageHeight = image.Height;
+
+            // Posição absoluta do toque na página (usando coordenação relativa ao controle)
+            var touchPosition = e.GetPosition(image);
+
+            // Calcular a posição do clique relativa ao tamanho da imagem
+            var relativeX = touchPosition.Value.X / imageWidth;
+            var relativeY = touchPosition.Value.Y / imageHeight;
+
+            // Retornar a posição em relação ao tamanho da Image
+            return new Point(relativeX * imageWidth, relativeY * imageHeight);
+        }
+    
+
+        // Receber e processar imagens do servidor
+        private async Task ReceiveImagesAsync()
 		{
 			try
 			{

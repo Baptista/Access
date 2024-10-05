@@ -81,7 +81,7 @@ namespace MauiApp3
 		{
 			try
 			{
-				System.Net.IPAddress ipaddress = System.Net.IPAddress.Parse("10.148.229.125");
+				System.Net.IPAddress ipaddress = System.Net.IPAddress.Parse("192.168.1.117");
 				_tcpListener = new TcpListener(IPAddress.Any, PORT);
 				_tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 				_tcpListener.Start();
@@ -95,7 +95,8 @@ namespace MauiApp3
 				var intent = _projectionManager.CreateScreenCaptureIntent();
 				Microsoft.Maui.ApplicationModel.Platform.CurrentActivity.StartActivityForResult(intent, 1000);
 
-				StatusLabel.Text = "Status: Aguardando permissão de captura de tela.";
+                
+                StatusLabel.Text = "Status: Aguardando permissão de captura de tela.";
 			}
 			catch (Exception ex)
 			{
@@ -136,8 +137,9 @@ namespace MauiApp3
 		private void OnClientAccepted(IAsyncResult ar)
 		{
 			_clientSocket = _tcpListener.EndAcceptSocket(ar);
-			//StartScreenCapture();
-		}
+            //StartScreenCapture();
+            Task.Run(() => ReceiveClientCommands());
+        }
 
 		private async  void StartScreenCapture()
 		{
@@ -215,7 +217,8 @@ namespace MauiApp3
 					_mediaProjection = _projectionManager.GetMediaProjection((int)resultCode, data);
 					StatusLabel.Text = "Permissão de captura de tela concedida.";
 					StartScreenCapture();
-				}
+                    
+                }
 				else
 				{
 					StatusLabel.Text = "Permissão de captura de tela negada.";
@@ -225,8 +228,83 @@ namespace MauiApp3
 				StatusLabel.Text = ex.Message;
 			}
 		}
+        private async Task ReceiveClientCommands()
+        {
+            try
+            {
+                byte[] buffer = new byte[1024];
+                while (true)
+                {
+                    int bytesRead = await _clientSocket.ReceiveAsync(buffer, SocketFlags.None);
+                    if (bytesRead > 0)
+                    {
+                        string message = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        ProcessClientCommand(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusLabel.Text = $"Erro ao receber comandos do cliente: {ex.Message}";
+            }
+        }
 
-		private async Task CaptureAndSendSurfaceImage()
+        private void ProcessClientCommand(string command)
+        {
+            // O formato esperado do comando é "MOVE x y" ou "CLICK x y"
+            string[] parts = command.Split(' ');
+            if (parts.Length == 3)
+            {
+                string action = parts[0];
+                if (float.TryParse(parts[1], out float x) && float.TryParse(parts[2], out float y))
+                {
+                    if (action == "MOVE")
+                    {
+                        SimulateTouch(x, y, MotionEventActions.Move);
+                    }
+                    else if (action == "CLICK")
+                    {
+                        // Simulate a click at the specified X and Y coordinates
+                        YourAccessibilityService accessibilityService = new YourAccessibilityService();
+                        accessibilityService.SimulateClick(x, y);
+                        //SimulateTouch(x, y, MotionEventActions.Down);
+                        //SimulateTouch(x, y, MotionEventActions.Up);
+                    }
+                }
+            }
+        }
+
+        private void SimulateTouch(float x, float y, MotionEventActions action)
+        {
+            try
+            {
+                    // Criar uma nova instância de Instrumentation
+                    var instrumentation = new Instrumentation();
+
+                    // Obter o tempo atual do sistema para o evento
+                    long downTime = SystemClock.UptimeMillis();
+                    long eventTime = SystemClock.UptimeMillis();
+
+                    // Criar o evento de toque
+                    MotionEvent touchEvent = MotionEvent.Obtain(
+                        downTime,
+                        eventTime,
+                        action, // Ação (Down, Move, Up)
+                        x,     // Coordenada X
+                        y,     // Coordenada Y
+                        0      // Meta state
+                    );
+
+                    // Enviar o evento de toque usando Instrumentation
+                    instrumentation.SendPointerSync(touchEvent);
+                
+            }
+            catch (Exception ex)
+            {
+				StatusLabel.Text = $"Erro ao simular toque: {ex.Message}";                
+            }
+        }
+        private async Task CaptureAndSendSurfaceImage()
 		{
 			try
 			{

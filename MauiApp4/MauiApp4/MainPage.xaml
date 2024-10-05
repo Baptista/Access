@@ -5,7 +5,13 @@
 
     <StackLayout>
         <Button Text="Connect to Server" Clicked="ConnectButton_Clicked" />
-        <Image x:Name="ScreenImage" WidthRequest="400" HeightRequest="300" Aspect="AspectFit" />
+        <Image x:Name="ScreenImage" WidthRequest="400" HeightRequest="300" Aspect="AspectFit">
+            <Image.GestureRecognizers>
+                <!-- Captura eventos de pan (arrastar) -->
+                <PanGestureRecognizer PanUpdated="OnPanUpdated" />
+                <TapGestureRecognizer Tapped="OnTapped" />
+            </Image.GestureRecognizers>
+        </Image>
         <Label x:Name="StatusLabel" Text="Status: Disconnected" />
     </StackLayout>
 
