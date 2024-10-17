@@ -109,6 +109,62 @@ namespace Access.Controllers
                 new Response { Status = "Success", Message = $"Invalid Code" });
         }
 
+
+
+        [HttpPost]
+        [Route("ForgotPassword")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordModel forgotPasswordModel)
+        {
+            if (string.IsNullOrEmpty(forgotPasswordModel.Email))
+                return BadRequest(new Response { IsSuccess = false, Message = "Email is required" });
+
+            var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
+            if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
+            {
+                // Não expor que o usuário não existe ou o email não está confirmado
+                return StatusCode(StatusCodes.Status200OK,
+                    new Response { IsSuccess = true, Message = "If your email is registered, you will receive a reset link." });
+            }
+
+            // Gerar token para redefinir senha
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var resetLink = Url.Action(nameof(ResetPassword), "Authentication",
+                new { token = resetToken, email = forgotPasswordModel.Email }, Request.Scheme);
+
+            // Enviar email com o link de redefinição de senha
+            var message = new Message(new string[] { forgotPasswordModel.Email! }, "Password Reset Request", resetLink!);
+            _emailService.SendEmail(message);
+
+            return StatusCode(StatusCodes.Status200OK,
+                new Response { IsSuccess = true, Message = "If your email is registered, you will receive a reset link." });
+        }
+
+        [HttpPost]
+        [Route("ResetPassword")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel resetPasswordModel)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" });
+
+            var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
+            if (user == null)
+            {
+                return StatusCode(StatusCodes.Status400BadRequest,
+                    new Response { IsSuccess = false, Message = "Invalid request" });
+            }
+
+            var resetPassResult = await _userManager.ResetPasswordAsync(user, resetPasswordModel.Token, resetPasswordModel.NewPassword);
+            if (!resetPassResult.Succeeded)
+            {
+                var errors = string.Join(", ", resetPassResult.Errors.Select(e => e.Description));
+                return StatusCode(StatusCodes.Status400BadRequest,
+                    new Response { IsSuccess = false, Message = $"Error resetting password: {errors}" });
+            }
+
+            return StatusCode(StatusCodes.Status200OK,
+                new Response { IsSuccess = true, Message = "Password has been reset successfully." });
+        }
+
         [HttpPost]
         [Route("Refresh-Token")]
         public async Task<IActionResult> RefreshToken(LoginResponse tokens)
@@ -122,7 +178,7 @@ namespace Access.Controllers
                 new Response { Status = "Success", Message = $"Invalid Code" });
         }
 
-        //
+        
 
     }
 }
