@@ -4,6 +4,6 @@ namespace Access.Services.Email
 {
     public interface IEmailService
     {
-        string SendEmail(Message message);
+        Task<EmailResponse> SendEmailAsync(Message message);
     }
 }

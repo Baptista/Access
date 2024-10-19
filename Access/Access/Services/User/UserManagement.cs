@@ -16,16 +16,19 @@ namespace Access.Services.User
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<UserManagement> _logger;
 
         public UserManagement(UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
-            SignInManager<ApplicationUser> signInManager, IConfiguration configuration)
+            SignInManager<ApplicationUser> signInManager,
+            IConfiguration configuration,
+            ILogger<UserManagement> logger)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _signInManager = signInManager;
             _configuration = configuration;
-
+            _logger = logger;
         }
 
         public async Task<ApiResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user)
@@ -37,8 +40,21 @@ namespace Access.Services.User
                 {
                     if (!await _userManager.IsInRoleAsync(user, role))
                     {
-                        await _userManager.AddToRoleAsync(user, role);
-                        assignedRole.Add(role);
+                        var result = await _userManager.AddToRoleAsync(user, role);
+                        if (result.Succeeded)
+                        {
+                            assignedRole.Add(role);
+                        }
+                        else
+                        {
+                            _logger.LogError($"Failed to assign role {role} to user {user.UserName}");
+                            return new ApiResponse<List<string>>
+                            {
+                                IsSuccess = false,
+                                StatusCode = 500,
+                                Message = $"Failed to assign role {role}."
+                            };
+                        }
                     }
                 }
             }
@@ -47,19 +63,26 @@ namespace Access.Services.User
             {
                 IsSuccess = true,
                 StatusCode = 200,
-                Message = "Roles has been assigned"
-            ,
+                Message = "Roles have been assigned",
                 Response = assignedRole
             };
         }
+
         public async Task<ApiResponse<CreateUserResponse>> CreateUserWithTokenAsync(RegisterUser registerUser)
         {
-            //Check User Exist 
+            // Check if the user or username already exists
             var userExist = await _userManager.FindByEmailAsync(registerUser.Email);
             if (userExist != null)
             {
                 return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "User already exists!" };
             }
+
+            var usernameExist = await _userManager.FindByNameAsync(registerUser.Username);
+            if (usernameExist != null)
+            {
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Username already exists!" };
+            }
+
             ApplicationUser user = new()
             {
                 Email = registerUser.Email,
@@ -67,33 +90,54 @@ namespace Access.Services.User
                 UserName = registerUser.Username,
                 TwoFactorEnabled = true
             };
+
             var result = await _userManager.CreateAsync(user, registerUser.Password);
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                return new ApiResponse<CreateUserResponse> { Response = new CreateUserResponse() { User = user, Token = token }, IsSuccess = true, StatusCode = 201, Message = "User Created" };
-
-            }
-            else
-            {
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User Failed to Create" };
-
+                _logger.LogError($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User creation failed" };
             }
 
+            // Generate email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogError("Failed to generate email confirmation token.");
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "Token generation failed" };
+            }
+
+            return new ApiResponse<CreateUserResponse>
+            {
+                Response = new CreateUserResponse { User = user, Token = token },
+                IsSuccess = true,
+                StatusCode = 201,
+                Message = "User created and confirmation token generated"
+            };
         }
+
         public async Task<ApiResponse<LoginOtpResponse>> GetOtpByLoginAsync(LoginModel loginModel)
         {
             var user = await _userManager.FindByNameAsync(loginModel.Username);
             if (user != null)
             {
-                await _signInManager.SignOutAsync();
-                await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
+                // Check if the user is locked out due to multiple failed attempts
+                var result = await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
+                if (result.IsLockedOut)
+                {
+                    return new ApiResponse<LoginOtpResponse>
+                    {
+                        IsSuccess = false,
+                        StatusCode = 423, // Locked out status code
+                        Message = "User account locked due to multiple failed login attempts."
+                    };
+                }
+
                 if (user.TwoFactorEnabled)
                 {
                     var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
                     return new ApiResponse<LoginOtpResponse>
                     {
-                        Response = new LoginOtpResponse()
+                        Response = new LoginOtpResponse
                         {
                             User = user,
                             Token = token,
@@ -101,15 +145,14 @@ namespace Access.Services.User
                         },
                         IsSuccess = true,
                         StatusCode = 200,
-                        Message = $"OTP send to the email {user.Email}"
+                        Message = $"OTP sent to the email {user.Email}"
                     };
-
                 }
                 else
                 {
                     return new ApiResponse<LoginOtpResponse>
                     {
-                        Response = new LoginOtpResponse()
+                        Response = new LoginOtpResponse
                         {
                             User = user,
                             Token = string.Empty,
@@ -117,7 +160,7 @@ namespace Access.Services.User
                         },
                         IsSuccess = true,
                         StatusCode = 200,
-                        Message = $"2FA is not enabled"
+                        Message = "2FA is not enabled"
                     };
                 }
             }
@@ -127,17 +170,18 @@ namespace Access.Services.User
                 {
                     IsSuccess = false,
                     StatusCode = 404,
-                    Message = $"User doesnot exist."
+                    Message = "User does not exist."
                 };
             }
         }
+
         public async Task<ApiResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user)
         {
             var authClaims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                };
+            {
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            };
 
             var userRoles = await _userManager.GetRolesAsync(user);
             foreach (var role in userRoles)
@@ -145,57 +189,50 @@ namespace Access.Services.User
                 authClaims.Add(new Claim(ClaimTypes.Role, role));
             }
 
-            var jwtToken = GetToken(authClaims); //access token
+            // Generate access and refresh tokens
+            var jwtToken = GetToken(authClaims); // Access token
             var refreshToken = GenerateRefreshToken();
             _ = int.TryParse(_configuration["JWT:RefreshTokenValidity"], out int refreshTokenValidity);
 
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(refreshTokenValidity);
-
             await _userManager.UpdateAsync(user);
 
             return new ApiResponse<LoginResponse>
             {
-                Response = new LoginResponse()
+                Response = new LoginResponse
                 {
-                    AccessToken = new TokenType()
+                    AccessToken = new TokenType
                     {
                         Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
                         ExpiryTokenDate = jwtToken.ValidTo
                     },
-                    RefreshToken = new TokenType()
+                    RefreshToken = new TokenType
                     {
                         Token = user.RefreshToken,
                         ExpiryTokenDate = (DateTime)user.RefreshTokenExpiry
                     }
                 },
-
                 IsSuccess = true,
                 StatusCode = 200,
-                Message = $"Token created"
+                Message = "Token created"
             };
         }
+
         public async Task<ApiResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName)
         {
             var user = await _userManager.FindByNameAsync(userName);
             var signIn = await _signInManager.TwoFactorSignInAsync("Email", otp, false, false);
-            if (signIn.Succeeded)
+            if (signIn.Succeeded && user != null)
             {
-                if (user != null)
-                {
-                    return await GetJwtTokenAsync(user);
-                }
+                return await GetJwtTokenAsync(user);
             }
-            return new ApiResponse<LoginResponse>()
+
+            return new ApiResponse<LoginResponse>
             {
-
-                Response = new LoginResponse()
-                {
-
-                },
                 IsSuccess = false,
                 StatusCode = 400,
-                Message = $"Invalid Otp"
+                Message = "Invalid OTP"
             };
         }
 
@@ -203,24 +240,35 @@ namespace Access.Services.User
         {
             var accessToken = tokens.AccessToken;
             var refreshToken = tokens.RefreshToken;
+
             var principal = GetClaimsPrincipal(accessToken.Token);
             var user = await _userManager.FindByNameAsync(principal.Identity.Name);
-            if (refreshToken.Token != user.RefreshToken && refreshToken.ExpiryTokenDate <= DateTime.Now)
+
+            if (refreshToken.Token != user.RefreshToken)
             {
                 return new ApiResponse<LoginResponse>
                 {
-
                     IsSuccess = false,
                     StatusCode = 400,
-                    Message = $"Token invalid or expired"
+                    Message = "Invalid refresh token"
                 };
             }
+
+            if (refreshToken.ExpiryTokenDate <= DateTime.Now)
+            {
+                return new ApiResponse<LoginResponse>
+                {
+                    IsSuccess = false,
+                    StatusCode = 400,
+                    Message = "Refresh token expired"
+                };
+            }
+
             var response = await GetJwtTokenAsync(user);
             return response;
         }
 
-
-        #region PrivateMethods
+        #region Private Methods
         private JwtSecurityToken GetToken(List<Claim> authClaims)
         {
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
@@ -229,21 +277,29 @@ namespace Access.Services.User
             var localTimeZone = TimeZoneInfo.Local;
             var expirationTimeInLocalTimeZone = TimeZoneInfo.ConvertTimeFromUtc(expirationTimeUtc, localTimeZone);
 
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JWT:ValidIssuer"],
-                audience: _configuration["JWT:ValidAudience"],
-                expires: expirationTimeInLocalTimeZone,
-                claims: authClaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+            try
+            {
+                var token = new JwtSecurityToken(
+                    issuer: _configuration["JWT:ValidIssuer"],
+                    audience: _configuration["JWT:ValidAudience"],
+                    expires: expirationTimeInLocalTimeZone,
+                    claims: authClaims,
+                    signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
-
-            return token;
+                return token;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error generating JWT: {ex.Message}");
+                throw;
+            }
         }
+
         private string GenerateRefreshToken()
         {
-            var randomNumber = new Byte[64];
-            var range = RandomNumberGenerator.Create();
-            range.GetBytes(randomNumber);
+            var randomNumber = new byte[64];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
         }
 
@@ -255,19 +311,15 @@ namespace Access.Services.User
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"])),
-                ValidateLifetime = false
+                ValidateLifetime = true, // Enforce token expiration validation
+                ClockSkew = TimeSpan.Zero  // Adjust for server time differences
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var principal = tokenHandler.ValidateToken(accessToken, tokenValidationParameters, out SecurityToken securityToken);
 
             return principal;
-
         }
-
-
-
         #endregion
-
     }
 }
