@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Access.Migrations
 {
     /// <inheritdoc />
-    public partial class ApplicationUser : Migration
+    public partial class Access : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -30,8 +30,8 @@ namespace Access.Migrations
                 columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
                 values: new object[,]
                 {
-                    { "4566fc28-0c2f-4a04-9159-99dcbbc10c55", "2", "User", "User" },
-                    { "a8bbb425-4a8f-48cf-85ef-205c4b54a6b7", "1", "Admin", "Admin" }
+                    { "6885d50c-098d-4ef4-930c-77bad40414a5", "2", "User", "User" },
+                    { "c123ff68-3ca5-4faf-8063-9906e987d1a9", "1", "Admin", "Admin" }
                 });
         }
 
@@ -41,12 +41,12 @@ namespace Access.Migrations
             migrationBuilder.DeleteData(
                 table: "AspNetRoles",
                 keyColumn: "Id",
-                keyValue: "4566fc28-0c2f-4a04-9159-99dcbbc10c55");
+                keyValue: "6885d50c-098d-4ef4-930c-77bad40414a5");
 
             migrationBuilder.DeleteData(
                 table: "AspNetRoles",
                 keyColumn: "Id",
-                keyValue: "a8bbb425-4a8f-48cf-85ef-205c4b54a6b7");
+                keyValue: "c123ff68-3ca5-4faf-8063-9906e987d1a9");
 
             migrationBuilder.DropColumn(
                 name: "RefreshToken",

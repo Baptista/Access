@@ -179,16 +179,16 @@ namespace Access.Controllers
 
         [HttpPost]
         [Route("Login-2FA")]
-        public async Task<IActionResult> LoginWithOTP(string code, string userName)
+        public async Task<IActionResult> LoginWithOTP([FromBody] LoginWithOtpModel loginWithOtpModel)
         {
-            var jwt = await _user.LoginUserWithJWTokenAsync(code, userName);
+            var jwt = await _user.LoginUserWithJWTokenAsync(loginWithOtpModel.Code, loginWithOtpModel.UserName);
             if (jwt.IsSuccess)
             {
-                _logger.LogInformation($"User {userName} successfully logged in with OTP.");
+                _logger.LogInformation($"User {loginWithOtpModel.UserName} successfully logged in with OTP.");
                 return Ok(jwt);
             }
 
-            _logger.LogWarning($"Invalid OTP attempt for {userName}.");
+            _logger.LogWarning($"Invalid OTP attempt for {loginWithOtpModel.UserName}.");
             return Unauthorized(new Response { Status = "Error", Message = "Invalid code" });
         }
 

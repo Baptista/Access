@@ -71,6 +71,16 @@ Log.Logger = new LoggerConfiguration()
 // Replace the default logger with Serilog
 builder.Host.UseSerilog();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
+
 // Configurar o pipeline da aplicação
 var app = builder.Build();
 

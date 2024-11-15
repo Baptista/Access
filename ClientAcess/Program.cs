@@ -3,6 +3,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Register HttpClient with a base address
+builder.Services.AddHttpClient("ApiClient", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

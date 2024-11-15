@@ -17,7 +17,7 @@ namespace Access.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.8")
+                .HasAnnotation("ProductVersion", "8.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -122,14 +122,14 @@ namespace Access.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "a8bbb425-4a8f-48cf-85ef-205c4b54a6b7",
+                            Id = "c123ff68-3ca5-4faf-8063-9906e987d1a9",
                             ConcurrencyStamp = "1",
                             Name = "Admin",
                             NormalizedName = "Admin"
                         },
                         new
                         {
-                            Id = "4566fc28-0c2f-4a04-9159-99dcbbc10c55",
+                            Id = "6885d50c-098d-4ef4-930c-77bad40414a5",
                             ConcurrencyStamp = "2",
                             Name = "User",
                             NormalizedName = "User"

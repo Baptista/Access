@@ -14,8 +14,6 @@ namespace Access.Data
         {
             base.OnModelCreating(builder);
             SeedRoles(builder);
-
-
         }
 
         private static void SeedRoles(ModelBuilder builder)
