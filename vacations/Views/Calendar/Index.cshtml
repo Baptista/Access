@@ -1,0 +1,141 @@
+﻿@using System.Globalization
+@model int
+@{
+    ViewData["Title"] = "Full Year Calendar";
+    int year = Model;
+}
+
+<h2>Full Year Calendar - @year</h2>
+
+<div id="calendar">
+    @for (int quarter = 0; quarter < 4; quarter++) // 4 rows (3 months each)
+    {
+        <div class="row">
+            @for (int monthOffset = 0; monthOffset < 3; monthOffset++) // 3 months per row
+            {
+                int month = quarter * 3 + monthOffset + 1; // Calculate month number
+                var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+                <div class="month-container">
+                    <h3>@monthName</h3>
+                    <table>
+                        <tr>
+                            <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
+                        </tr>
+                        @{
+                            var daysInMonth = DateTime.DaysInMonth(Model, month);
+                            var startDay = (int)new DateTime(Model, month, 1).DayOfWeek;
+                            int currentDay = 1;
+
+                            for (int week = 0; week < 6 && currentDay <= daysInMonth; week++)
+                            {
+                                <tr>
+                                    @for (int day = 0; day < 7; day++)
+                                    {
+                                        if ((week == 0 && day < startDay) || currentDay > daysInMonth)
+                                        {
+                                            <td></td>
+                                        }
+                                        else
+                                        {
+                                            <td>
+                                                <button class="btn btn-outline-primary day-button btn-sm" data-day="@(new DateTime(Model, month, currentDay).ToString("dd MMMM yyyy"))">
+                                                    @currentDay
+                                                </button>
+                                                @{
+                                                    currentDay++;
+                                                }
+                                            </td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        }
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+<button id="save-selection" class="btn btn-success">Save Selection</button>
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+
+<script>
+    const selectedDays = new Set();
+
+    document.querySelectorAll('.day-button').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const day = event.target.getAttribute('data-day');
+            if (selectedDays.has(day)) {
+                selectedDays.delete(day);
+                event.target.classList.remove('selected');
+            } else {
+                selectedDays.add(day);
+                event.target.classList.add('selected');
+            }
+        });
+    });
+
+   document.getElementById('save-selection').addEventListener('click', () => {
+    const selectedDays = [...document.querySelectorAll('.day-button.selected')].map(btn =>
+        btn.getAttribute('data-day')
+    );
+
+    if (selectedDays.length === 0) {
+        alert("No days selected!");
+        return;
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/Calendar/SaveSelection';
+
+    selectedDays.forEach(day => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selectedDays';
+        input.value = day;
+        form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+});
+          
+</script>
+<style>
+    .selected { background-color: lightblue; }
+
+    .day-button {
+        width: 40px; /* Uniform width for all buttons */
+        height: 40px; /* Uniform height for all buttons */
+        padding: 0; /* Remove default padding */
+        text-align: center; /* Center-align the text */
+        line-height: 40px; /* Vertically align text */
+        border-radius: 50%; /* Circular buttons */
+        margin: 5px; /* Add spacing between buttons */
+        font-size: 14px; /* Adjust font size */
+        transition: all 0.3s ease-in-out; /* Smooth hover and focus transitions */
+    }
+
+        .day-button:hover {
+            background-color: #007bff; /* Change to primary blue on hover */
+            color: #fff; /* White text on hover */
+            transform: scale(1.1); /* Slight zoom effect */
+        }
+
+        .day-button.selected {
+            background-color: #28a745; /* Green for selected state */
+            color: white;
+            border-color: #28a745;
+        }
+   
+}
+</style>
