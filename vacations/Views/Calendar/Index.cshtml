@@ -1,11 +1,14 @@
 ﻿@using System.Globalization
 @model int
 @{
-    ViewData["Title"] = "Full Year Calendar";
+    ViewData["Title"] = "Vacations";
     int year = Model;
 }
-
-<h2>Full Year Calendar - @year</h2>
+<div class="name-input">
+    <label for="userName">Enter Your Name:</label>
+    <input type="text" id="userName" name="userName" class="form-control" placeholder="Your Name">
+</div>
+<h2>Calendar - @year</h2>
 
 <div id="calendar">
     @for (int quarter = 0; quarter < 4; quarter++) // 4 rows (3 months each)
@@ -83,31 +86,48 @@
         });
     });
 
-   document.getElementById('save-selection').addEventListener('click', () => {
-    const selectedDays = [...document.querySelectorAll('.day-button.selected')].map(btn =>
-        btn.getAttribute('data-day')
-    );
+    document.getElementById('save-selection').addEventListener('click', () => {
+        const selectedDays = [...document.querySelectorAll('.day-button.selected')].map(btn =>
+            btn.getAttribute('data-day')
+        );
 
-    if (selectedDays.length === 0) {
-        alert("No days selected!");
-        return;
-    }
+        const userName = document.getElementById('userName').value.trim();
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/Calendar/SaveSelection';
+        if (!userName) {
+            alert("Please enter your name!");
+            return;
+        }
 
-    selectedDays.forEach(day => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selectedDays';
-        input.value = day;
-        form.appendChild(input);
+        if (selectedDays.length === 0) {
+            alert("No days selected!");
+            return;
+        }
+
+        // Create a form to send the name and selected days to the server
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/Calendar/SaveSelection';
+
+        // Add name as a hidden input
+        const nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = 'userName';
+        nameInput.value = userName;
+        form.appendChild(nameInput);
+
+        // Add selected days as hidden inputs
+        selectedDays.forEach(day => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selectedDays';
+            input.value = day;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
     });
 
-    document.body.appendChild(form);
-    form.submit();
-});
           
 </script>
 <style>
@@ -136,6 +156,18 @@
             color: white;
             border-color: #28a745;
         }
-   
-}
+
+    .name-input {
+        margin-bottom: 20px;
+    }
+
+        .name-input label {
+            font-weight: bold;
+        }
+
+        .name-input input {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 5px;
+        }
 </style>
