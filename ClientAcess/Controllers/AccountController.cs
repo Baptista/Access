@@ -29,8 +29,17 @@ namespace ClientAcess.Controllers
             {
                 return RedirectToAction("Login");
             }
+            var errorContent = await response.Content.ReadAsStringAsync();
+            var apiError = JsonConvert.DeserializeObject<ApiResponse>(errorContent); // Adjust to your API error model
 
-            ModelState.AddModelError(string.Empty, "Error registering user");
+            if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
+            {
+                ModelState.AddModelError(string.Empty, apiError.Message);
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Error registering user");
+            }            
             return View(model);
         }
 
@@ -53,9 +62,19 @@ namespace ClientAcess.Controllers
                 //HttpContext.Session.SetString("JWToken", authResponse.Token);
 
                 return RedirectToAction("Index", "Home");
-            }
+            } // Extract error message from API response
+            var errorContent = await response.Content.ReadAsStringAsync();
+            var apiError = JsonConvert.DeserializeObject<ApiResponse>(errorContent); // Adjust to your API error model
 
-            ModelState.AddModelError(string.Empty, "Invalid login attempt");
+            if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
+            {
+                ModelState.AddModelError(string.Empty, apiError.Message);
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+            }
+            
             return View(model);
         }
 

@@ -1,9 +1,12 @@
-﻿namespace Access.Models
+﻿using Access.Constants;
+
+namespace Access.Models
 {
     public class Response
     {
-        public string? Status { get; set; }
+        public ApiCode Status { get; set; }
         public string? Message { get; set; }
         public bool IsSuccess { get; set; }
+        public object? Result { get; set; }
     }
 }

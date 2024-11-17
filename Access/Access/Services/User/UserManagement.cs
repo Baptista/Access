@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Access.Constants;
 
 namespace Access.Services.User
 {
@@ -52,7 +53,8 @@ namespace Access.Services.User
                             {
                                 IsSuccess = false,
                                 StatusCode = 500,
-                                Message = $"Failed to assign role {role}."
+                                Message = $"Failed to assign role {role}.",
+                                InternalCode = ApiCode.FailedToAssignRole
                             };
                         }
                     }
@@ -64,7 +66,8 @@ namespace Access.Services.User
                 IsSuccess = true,
                 StatusCode = 200,
                 Message = "Roles have been assigned",
-                Response = assignedRole
+                Response = assignedRole,
+                InternalCode = ApiCode.Success
             };
         }
 
@@ -74,13 +77,13 @@ namespace Access.Services.User
             var userExist = await _userManager.FindByEmailAsync(registerUser.Email);
             if (userExist != null)
             {
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "User already exists!" };
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Email already exists!", InternalCode = ApiCode.EmailAlreadyExists };
             }
 
             var usernameExist = await _userManager.FindByNameAsync(registerUser.Username);
             if (usernameExist != null)
             {
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Username already exists!" };
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Username already exists!" , InternalCode = ApiCode.UserAlreadyExists };
             }
 
             ApplicationUser user = new()
@@ -95,7 +98,7 @@ namespace Access.Services.User
             if (!result.Succeeded)
             {
                 _logger.LogError($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User creation failed" };
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User creation failed" , InternalCode = ApiCode.UserCreationFailed };
             }
 
             // Generate email confirmation token
@@ -103,7 +106,7 @@ namespace Access.Services.User
             if (string.IsNullOrEmpty(token))
             {
                 _logger.LogError("Failed to generate email confirmation token.");
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "Token generation failed" };
+                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "Token generation failed", InternalCode = ApiCode.TokenGenerationFailed };
             }
 
             return new ApiResponse<CreateUserResponse>
@@ -111,7 +114,8 @@ namespace Access.Services.User
                 Response = new CreateUserResponse { User = user, Token = token },
                 IsSuccess = true,
                 StatusCode = 201,
-                Message = "User created and confirmation token generated"
+                Message = "User created and confirmation token generated",
+                InternalCode = ApiCode.Success
             };
         }
 
@@ -120,6 +124,19 @@ namespace Access.Services.User
             var user = await _userManager.FindByNameAsync(loginModel.Username);
             if (user != null)
             {
+
+                if (!await _userManager.IsEmailConfirmedAsync(user))
+                {
+                    _logger.LogWarning($"Login failed for {loginModel.Username}. Email not confirmed.");
+                    return new ApiResponse<LoginOtpResponse>
+                    {
+                        IsSuccess = false,
+                        StatusCode = 401,
+                        Message = "Email not confirmed. Please check your email and confirm your account.",
+                        InternalCode= ApiCode.EmailNotConfirmed
+                    };
+                }
+
                 // Check if the user is locked out due to multiple failed attempts
                 var result = await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
                 if (result.IsLockedOut)
@@ -128,7 +145,8 @@ namespace Access.Services.User
                     {
                         IsSuccess = false,
                         StatusCode = 423, // Locked out status code
-                        Message = "User account locked due to multiple failed login attempts."
+                        Message = "User account locked due to multiple failed login attempts.",
+                        InternalCode = ApiCode.UserAccountLocked
                     };
                 }
 
@@ -145,7 +163,8 @@ namespace Access.Services.User
                         },
                         IsSuccess = true,
                         StatusCode = 200,
-                        Message = $"OTP sent to the email {user.Email}"
+                        Message = $"OTP sent to the email {user.Email}",
+                        InternalCode = ApiCode.Success
                     };
                 }
                 else
@@ -160,7 +179,8 @@ namespace Access.Services.User
                         },
                         IsSuccess = true,
                         StatusCode = 200,
-                        Message = "2FA is not enabled"
+                        Message = "2FA is not enabled",
+                        InternalCode = ApiCode.Disable2FA
                     };
                 }
             }
@@ -170,7 +190,8 @@ namespace Access.Services.User
                 {
                     IsSuccess = false,
                     StatusCode = 404,
-                    Message = "User does not exist."
+                    Message = "User does not exist.",
+                    InternalCode = ApiCode.UserNotFound
                 };
             }
         }
@@ -215,7 +236,8 @@ namespace Access.Services.User
                 },
                 IsSuccess = true,
                 StatusCode = 200,
-                Message = "Token created"
+                Message = "Token created",
+                InternalCode = ApiCode.Success
             };
         }
 
@@ -232,7 +254,8 @@ namespace Access.Services.User
             {
                 IsSuccess = false,
                 StatusCode = 400,
-                Message = "Invalid OTP"
+                Message = "Invalid OTP",
+                InternalCode = ApiCode.InvalidOTP
             };
         }
 
@@ -250,7 +273,8 @@ namespace Access.Services.User
                 {
                     IsSuccess = false,
                     StatusCode = 400,
-                    Message = "Invalid refresh token"
+                    Message = "Invalid refresh token",
+                    InternalCode = ApiCode.InvalidRefreshToken
                 };
             }
 
@@ -260,7 +284,8 @@ namespace Access.Services.User
                 {
                     IsSuccess = false,
                     StatusCode = 400,
-                    Message = "Refresh token expired"
+                    Message = "Refresh token expired",
+                    InternalCode = ApiCode.RefreshTokenExpired
                 };
             }
 

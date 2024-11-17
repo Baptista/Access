@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Response = Access.Models.Response;
+using Access.Constants;
 
 namespace Access.Controllers
 {
@@ -38,7 +39,7 @@ namespace Access.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid registration attempt.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" });
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
 
             // Check if the user already exists by email
@@ -65,16 +66,17 @@ namespace Access.Controllers
                         return Ok(new Response
                         {
                             IsSuccess = true,
-                            Message = "Your email is already registered but not confirmed. A new confirmation email has been sent."
+                            Message = "Your email is already registered but not confirmed. A new confirmation email has been sent.",
+                            Status = ApiCode.EmailNotConfirmed
                         });
                     }
 
                     _logger.LogError($"Failed to resend confirmation email to {registerUser.Email}");
-                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later." });
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later.", Status = ApiCode.FailSendEmail });
                 }
 
                 // If the email is confirmed, return a message indicating that the user already exists
-                return BadRequest(new Response { IsSuccess = false, Message = "User already exists and email is confirmed." });
+                return BadRequest(new Response { IsSuccess = false, Message = "User already exists and email is confirmed." , Status = ApiCode.UserAlreadyExist });
             }
 
             // Proceed with new user registration since the email is not in use
@@ -90,7 +92,7 @@ namespace Access.Controllers
             if (!resultCreate.Succeeded)
             {
                 _logger.LogError($"Failed to create user: {string.Join(", ", resultCreate.Errors.Select(e => e.Description))}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "User creation failed." });
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "User creation failed.", Status = ApiCode.UserCreationFailed });
             }
 
             // Generate confirmation token for new user
@@ -106,11 +108,11 @@ namespace Access.Controllers
 
             if (sendResult.Success)
             {
-                return Ok(new Response { IsSuccess = true, Message = "User registered successfully. Please confirm your email." });
+                return Ok(new Response { IsSuccess = true, Message = "User registered successfully. Please confirm your email.", Status = ApiCode.Success });
             }
 
             _logger.LogError($"Failed to send confirmation email to {registerUser.Email}");
-            return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later." });
+            return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later.", Status = ApiCode.FailSendEmail });
         }
 
         [HttpGet("ConfirmEmail")]
@@ -120,18 +122,18 @@ namespace Access.Controllers
             if (user == null)
             {
                 _logger.LogWarning($"Email confirmation failed. User {email} does not exist.");
-                return NotFound(new Response { Status = "Error", Message = "This user does not exist!" });
+                return NotFound(new Response { Status = ApiCode.UserNotFound, IsSuccess = false, Message = "This user does not exist!" });
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, token);
             if (result.Succeeded)
             {
                 _logger.LogInformation($"Email confirmed for user {email}.");
-                return Ok(new Response { Status = "Success", Message = "Email verified successfully" });
+                return Ok(new Response { Status = ApiCode.Success, IsSuccess = true, Message = "Email verified successfully" });
             }
 
             _logger.LogWarning($"Email confirmation failed for {email}. Invalid or expired token.");
-            return BadRequest(new Response { Status = "Error", Message = "Invalid or expired token." });
+            return BadRequest(new Response { Status = ApiCode.ExpiredTokenEmail, IsSuccess = false, Message = "Invalid or expired token." });
         }
 
         [HttpPost]
@@ -141,40 +143,48 @@ namespace Access.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid login attempt.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" });
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" , Status = ApiCode.InvalidInputData});
             }
+
 
             var loginOtpResponse = await _user.GetOtpByLoginAsync(loginModel);
-            if (loginOtpResponse.Response != null)
+            if (!loginOtpResponse.IsSuccess)
             {
-                var user = loginOtpResponse.Response.User;
-                if (user.TwoFactorEnabled)
+                return StatusCode(loginOtpResponse.StatusCode, new Response
                 {
-                    var token = loginOtpResponse.Response.Token;
-                    var message = new Message(new string[] { user.Email! }, "OTP Confirmation", token);
-                    var emailResult = await _emailService.SendEmailAsync(message);
-
-                    if (!emailResult.Success)
-                    {
-                        _logger.LogError($"Failed to send OTP email to {user.Email}.");
-                        return StatusCode(StatusCodes.Status500InternalServerError,
-                                          new Response { IsSuccess = false, Message = "Failed to send OTP email. Please try again later." });
-                    }
-
-                    _logger.LogInformation($"OTP sent to {user.Email}.");
-                    return Ok(new Response { IsSuccess = loginOtpResponse.IsSuccess, Status = "Success", Message = $"We have sent an OTP to your email {user.Email}" });
-                }
-
-                if (user != null && await _userManager.CheckPasswordAsync(user, loginModel.Password))
-                {
-                    var serviceResponse = await _user.GetJwtTokenAsync(user);
-                    _logger.LogInformation($"User {user.Email} logged in successfully.");
-                    return Ok(serviceResponse);
-                }
+                    IsSuccess = false,
+                    Message = loginOtpResponse.Message
+                });
             }
 
+            var user = loginOtpResponse.Response.User;
+            if (user.TwoFactorEnabled)
+            {
+                var token = loginOtpResponse.Response.Token;
+                var message = new Message(new string[] { user.Email! }, "OTP Confirmation", token);
+                var emailResult = await _emailService.SendEmailAsync(message);
+
+                if (!emailResult.Success)
+                {
+                    _logger.LogError($"Failed to send OTP email to {user.Email}.");
+                    return StatusCode(StatusCodes.Status500InternalServerError,
+                                      new Response { IsSuccess = false, Message = "Failed to send OTP email. Please try again later.", Status = ApiCode.FailSendOTP });
+                }
+
+                _logger.LogInformation($"OTP sent to {user.Email}.");
+                return Ok(new Response { IsSuccess = loginOtpResponse.IsSuccess, Status = ApiCode.Success, Message = $"We have sent an OTP to your email {user.Email}" });
+            }
+
+            if (user != null && await _userManager.CheckPasswordAsync(user, loginModel.Password))
+            {
+                var serviceResponse = await _user.GetJwtTokenAsync(user);
+                _logger.LogInformation($"User {user.Email} logged in successfully.");
+                return Ok(new Response { Result  = serviceResponse, IsSuccess = true, Message = "Logged in successfully.", Status = ApiCode.Success }  );
+            }
+
+
             _logger.LogWarning($"Invalid login attempt for {loginModel.Username}.");
-            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid credentials" });
+            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid credentials" , Status = ApiCode.InvalidCredentials });
         }
 
         [HttpPost]
@@ -185,11 +195,11 @@ namespace Access.Controllers
             if (jwt.IsSuccess)
             {
                 _logger.LogInformation($"User {loginWithOtpModel.UserName} successfully logged in with OTP.");
-                return Ok(jwt);
+                return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Logged in successfully.", Status = ApiCode.Success });
             }
 
             _logger.LogWarning($"Invalid OTP attempt for {loginWithOtpModel.UserName}.");
-            return Unauthorized(new Response { Status = "Error", Message = "Invalid code" });
+            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid code" , Status = ApiCode.InvalidOTP });
         }
 
         [HttpPost]
@@ -199,14 +209,14 @@ namespace Access.Controllers
             if (string.IsNullOrEmpty(forgotPasswordModel.Email))
             {
                 _logger.LogWarning("Forgot password attempt with missing email.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Email is required" });
+                return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired  });
             }
 
             var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
             if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
             {
                 _logger.LogInformation($"Password reset request for unconfirmed or non-existent user {forgotPasswordModel.Email}.");
-                return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link." });
+                return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.ResetLink });
             }
 
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
@@ -217,7 +227,7 @@ namespace Access.Controllers
             await _emailService.SendEmailAsync(message);
 
             _logger.LogInformation($"Password reset link sent to {forgotPasswordModel.Email}.");
-            return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link." });
+            return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.Success });
         }
 
         [HttpPost]
@@ -227,14 +237,14 @@ namespace Access.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid reset password attempt.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" });
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData});
             }
 
             var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
             if (user == null)
             {
-                _logger.LogWarning($"Reset password attempt for non-existent user {resetPasswordModel.Email}.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid request" });
+                _logger.LogWarning($"Reset password attempt for non-existent email {resetPasswordModel.Email}.");
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.EmailNotFound });
             }
 
             var resetPassResult = await _userManager.ResetPasswordAsync(user, resetPasswordModel.Token, resetPasswordModel.NewPassword);
@@ -242,11 +252,11 @@ namespace Access.Controllers
             {
                 var errors = string.Join(", ", resetPassResult.Errors.Select(e => e.Description));
                 _logger.LogWarning($"Failed password reset for {resetPasswordModel.Email}. Errors: {errors}");
-                return BadRequest(new Response { IsSuccess = false, Message = $"Error resetting password: {errors}" });
+                return BadRequest(new Response { IsSuccess = false, Message = $"Error resetting password: {errors}" , Status = ApiCode.FailedResetPassword });
             }
 
             _logger.LogInformation($"Password reset successfully for {resetPasswordModel.Email}.");
-            return Ok(new Response { IsSuccess = true, Message = "Password has been reset successfully." });
+            return Ok(new Response { IsSuccess = true, Message = "Password has been reset successfully.", Status = ApiCode.Success });
         }
 
         [HttpPost]
@@ -257,11 +267,11 @@ namespace Access.Controllers
             if (jwt.IsSuccess)
             {
                 _logger.LogInformation($"Token refreshed successfully for {tokens.Username}.");
-                return Ok(jwt);
+                return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Token refreshed successfully.", Status = ApiCode.Success });
             }
 
             _logger.LogWarning($"Failed token refresh attempt for {tokens.Username}.");
-            return Unauthorized(new Response { Status = "Error", Message = "Invalid token or refresh token." });
+            return Unauthorized(new Response { Status = ApiCode.RefreshTokenExpired, IsSuccess = false, Message = "Invalid token or refresh token." });
         }
     }
 }
