@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Access.Attributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Access.Models.Authentication
 {
@@ -12,12 +13,14 @@ namespace Access.Models.Authentication
         public string Email { get; set; }
 
         [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters long.")]
+        [PasswordComplexity]
         public string NewPassword { get; set; }
 
         [DataType(DataType.Password)]
         [Compare("NewPassword", ErrorMessage = "The password and confirmation password do not match.")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters long.")]
+        [PasswordComplexity]
         public string ConfirmPassword { get; set; }
     }
 }

@@ -8,6 +8,6 @@ namespace Access.Models
         public string? Message { get; set; }
         public int StatusCode { get; set; }
         public T? Response { get; set; }
-        public ApiErrorCode InternalCode { get; set; }
+        public ApiCode InternalCode { get; set; }
     }
 }

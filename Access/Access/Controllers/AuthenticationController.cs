@@ -20,16 +20,18 @@ namespace Access.Controllers
         private readonly IEmailService _emailService;
         private readonly IUserManagement _user;
         private readonly ILogger<AuthenticationController> _logger;
-
+        private readonly IConfiguration _configuration;
         public AuthenticationController(UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IUserManagement user,
+            IConfiguration configuration,
             ILogger<AuthenticationController> logger)
         {
             _userManager = userManager;
             _emailService = emailService;
             _user = user;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpPost]
@@ -150,6 +152,21 @@ namespace Access.Controllers
             var loginOtpResponse = await _user.GetOtpByLoginAsync(loginModel);
             if (!loginOtpResponse.IsSuccess)
             {
+                if(loginOtpResponse.InternalCode == ApiCode.EmailNotConfirmed)
+                {
+                    var loginuser = await _userManager.FindByNameAsync(loginModel.Username);
+                    // Generate confirmation token for new user
+                    var tokenNewUser = await _userManager.GenerateEmailConfirmationTokenAsync(loginuser);
+
+                    // Create confirmation link
+                    var confirmationLinkNewUser = Url.Action(nameof(ConfirmEmail), "Authentication",
+                        new { token = tokenNewUser, email = loginuser.Email }, Request.Scheme);
+
+                    // Send confirmation email
+                    var messageNewUser = new Message(new[] { loginuser.Email }, "Confirm your email", confirmationLinkNewUser);
+                    var sendResult = await _emailService.SendEmailAsync(messageNewUser);
+                }
+
                 return StatusCode(loginOtpResponse.StatusCode, new Response
                 {
                     IsSuccess = false,
@@ -220,10 +237,14 @@ namespace Access.Controllers
             }
 
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var resetLink = Url.Action(nameof(ResetPassword), "Authentication",
-                new { token = resetToken, email = forgotPasswordModel.Email }, Request.Scheme);
+            // **Update the Reset Link to Point to the Client Application**
+            var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ResetPassword?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(forgotPasswordModel.Email)}";
 
-            var message = new Message(new string[] { forgotPasswordModel.Email! }, "Password Reset Request", resetLink!);
+            var message = new Message(
+                new string[] { forgotPasswordModel.Email! },
+                "Password Reset Request",
+                $"Please reset your password by clicking this link: {clientResetLink}"
+            );
             await _emailService.SendEmailAsync(message);
 
             _logger.LogInformation($"Password reset link sent to {forgotPasswordModel.Email}.");

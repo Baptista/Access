@@ -2,6 +2,7 @@
 using ClientAcess.Models;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using NuGet.Common;
 using System.Text;
 
 namespace ClientAcess.Controllers
@@ -20,7 +21,7 @@ namespace ClientAcess.Controllers
         [HttpPost]
         public async Task<IActionResult> Register(RegisterModel model)
         {
-            model.Roles = [ "User"];
+            model.Roles = ["User"];
             if (!ModelState.IsValid) return View(model);
 
             var response = await _httpClient.PostAsJsonAsync("register", model);
@@ -30,7 +31,7 @@ namespace ClientAcess.Controllers
                 return RedirectToAction("Login");
             }
             var errorContent = await response.Content.ReadAsStringAsync();
-            var apiError = JsonConvert.DeserializeObject<ApiResponse>(errorContent); // Adjust to your API error model
+            var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
@@ -39,12 +40,19 @@ namespace ClientAcess.Controllers
             else
             {
                 ModelState.AddModelError(string.Empty, "Error registering user");
-            }            
+            }
             return View(model);
         }
 
         [HttpGet]
-        public IActionResult Login() => View();
+        public IActionResult Login() {
+            Request.Cookies.TryGetValue("jwtToken", out var token);
+            if (!string.IsNullOrEmpty(token))
+            {
+                return RedirectToAction("Dashboard", "Home");
+            }
+            return View(); 
+        }
 
         [HttpPost]
         public async Task<IActionResult> Login(LoginModel model)
@@ -60,11 +68,11 @@ namespace ClientAcess.Controllers
 
                 // Armazenar o token na sessão ou cookie
                 //HttpContext.Session.SetString("JWToken", authResponse.Token);
-
-                return RedirectToAction("Index", "Home");
+                
+                return RedirectToAction("LoginWithOTP", new { userName = model .Username});
             } // Extract error message from API response
             var errorContent = await response.Content.ReadAsStringAsync();
-            var apiError = JsonConvert.DeserializeObject<ApiResponse>(errorContent); // Adjust to your API error model
+            var apiError = JsonConvert.DeserializeObject<Response>(errorContent); // Adjust to your API error model
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
@@ -149,6 +157,16 @@ namespace ClientAcess.Controllers
 
             if (response.IsSuccessStatusCode)
             {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                var apiError = JsonConvert.DeserializeObject<Response>(errorContent); // Adjust to your API error model
+
+                Response.Cookies.Append("jwtToken", apiError.Result.Response.AccessToken.Token, new CookieOptions
+                {
+                    HttpOnly = true, // Prevent JavaScript access
+                    Secure = true,   // Use HTTPS only
+                    Expires = apiError.Result.Response.AccessToken.ExpiryTokenDate.AddMinutes(10)
+                });
+
                 // Handle successful login, e.g., redirect to a dashboard
                 return RedirectToAction("Dashboard", "Home");
             }

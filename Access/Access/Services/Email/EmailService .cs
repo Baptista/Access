@@ -4,6 +4,7 @@ using MimeKit;
 using MailKit.Net.Smtp;
 using Polly.Retry;
 using Polly;
+//using System.Net.Mail;
 
 namespace Access.Services.Email
 {
@@ -35,7 +36,7 @@ namespace Access.Services.Email
             {
                 await _retryPolicy.ExecuteAsync(() => SendAsync(emailMessage));
                 var recipients = string.Join(", ", message.To);
-                return new EmailResponse(true, ResponseMessages.GetEmailSuccessMessage(recipients));
+                return new EmailResponse(true, $"Email sent successfully to {recipients}");
             }
             catch (Exception ex)
             {
@@ -43,7 +44,7 @@ namespace Access.Services.Email
                 _logger.LogError($"Error sending email: {ex.Message}. StackTrace: {ex.StackTrace}");
 
                 var recipients = string.Join(", ", message.To);
-                return new EmailResponse(false, ResponseMessages.GetEmailFailureMessage(recipients));
+                return new EmailResponse(false, $"Error sending email to {recipients}");
             }
         }
 
