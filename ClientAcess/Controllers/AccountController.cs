@@ -2,18 +2,19 @@
 using ClientAcess.Models;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using NuGet.Common;
-using System.Text;
 
 namespace ClientAcess.Controllers
 {
     public class AccountController : Controller
     {
         private readonly HttpClient _httpClient;
-        public AccountController(HttpClient httpClient)
+        private readonly IConfiguration _configuration;
+        public AccountController(HttpClient httpClient,
+            IConfiguration configuration)
         {
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
+            _configuration = configuration;
         }
         [HttpGet]
         public IActionResult Register() => View();
@@ -35,11 +36,11 @@ namespace ClientAcess.Controllers
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
-                ModelState.AddModelError(string.Empty, apiError.Message);
+                ViewBag.Message = apiError.Message;                
             }
             else
             {
-                ModelState.AddModelError(string.Empty, "Error registering user");
+                ViewBag.Message = "Error registering user";                
             }
             return View(model);
         }
@@ -62,27 +63,20 @@ namespace ClientAcess.Controllers
             var response = await _httpClient.PostAsJsonAsync("login", model);
 
             if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadAsStringAsync();
-                //var authResponse = JsonConvert.DeserializeObject<AuthResponse>(result);
-
-                // Armazenar o token na sessão ou cookie
-                //HttpContext.Session.SetString("JWToken", authResponse.Token);
-                
+            {   
                 return RedirectToAction("LoginWithOTP", new { userName = model .Username});
-            } // Extract error message from API response
+            }
             var errorContent = await response.Content.ReadAsStringAsync();
-            var apiError = JsonConvert.DeserializeObject<Response>(errorContent); // Adjust to your API error model
+            var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
-                ModelState.AddModelError(string.Empty, apiError.Message);
+                ViewBag.Message = apiError.Message;                
             }
             else
             {
-                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-            }
-            
+                ViewBag.Message = "Invalid login attempt";                
+            }            
             return View(model);
         }
 
@@ -107,8 +101,7 @@ namespace ClientAcess.Controllers
             {
                 return RedirectToAction("Login");
             }
-
-            ModelState.AddModelError(string.Empty, "Failed to reset password.");
+            ViewBag.Message = "Failed to reset password";            
             return View(model);
         }
 
@@ -133,8 +126,7 @@ namespace ClientAcess.Controllers
                 ViewBag.Message = "If the email exists, a reset link has been sent.";
                 return View();
             }
-
-            ModelState.AddModelError(string.Empty, "Error sending reset link.");
+            ViewBag.Message = "Error sending reset link.";            
             return View(model);
         }
 
@@ -158,16 +150,15 @@ namespace ClientAcess.Controllers
             if (response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                var apiError = JsonConvert.DeserializeObject<Response>(errorContent); // Adjust to your API error model
-
-                Response.Cookies.Append("jwtToken", apiError.Result.Response.AccessToken.Token, new CookieOptions
+                var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
+                var tokentime = string.IsNullOrEmpty(_configuration["ExpirateTokenTime"])? Convert.ToDouble(_configuration["ExpirateTokenTime"]) : 24;
+                Response.Cookies.Append("jwtToken", apiError.Result.Response?.AccessToken.Token, new CookieOptions
                 {
-                    HttpOnly = true, // Prevent JavaScript access
-                    Secure = true,   // Use HTTPS only
-                    Expires = apiError.Result.Response.AccessToken.ExpiryTokenDate.AddMinutes(10)
+                    HttpOnly = true, 
+                    Secure = true,   
+                    Expires = apiError.Result.Response?.AccessToken.ExpiryTokenDate.AddHours(tokentime)
                 });
-
-                // Handle successful login, e.g., redirect to a dashboard
+                                
                 return RedirectToAction("Dashboard", "Home");
             }
 

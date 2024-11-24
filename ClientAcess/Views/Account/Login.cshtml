@@ -2,7 +2,7 @@
 
 <div class="container">
     <h2>Login</h2>
-    @* Isso exibirá todas as mensagens de erro adicionadas com ModelState.AddModelError *@
+    
     <div asp-validation-summary="All" class="text-danger"></div>
 
     <form asp-action="Login">
@@ -20,6 +20,12 @@
 
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
-
-    <a href="@Url.Action("ForgotPassword", "Account")">Forgot Password?</a>
+    @if (ViewBag.Message != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @ViewBag.Message
+        </div>
+    }
+    <a href="@Url.Action("ForgotPassword", "Account")">Forgot Password</a>
+    <a href="@Url.Action("Register", "Account")">Register</a>
 </div>
