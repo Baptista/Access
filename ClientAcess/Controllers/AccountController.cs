@@ -2,6 +2,8 @@
 using ClientAcess.Models;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Net.Http.Headers;
 
 namespace ClientAcess.Controllers
 {
@@ -46,11 +48,14 @@ namespace ClientAcess.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login() {
+        public async Task<IActionResult> Login() {
             Request.Cookies.TryGetValue("jwtToken", out var token);
-            if (!string.IsNullOrEmpty(token))
+            if (!string.IsNullOrEmpty(token))            
             {
-                return RedirectToAction("Dashboard", "Home");
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _httpClient.GetAsync("ValidateToken");
+                if(response.IsSuccessStatusCode)
+                    return RedirectToAction("Index", "Home");
             }
             return View(); 
         }
@@ -151,15 +156,14 @@ namespace ClientAcess.Controllers
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
-                var tokentime = string.IsNullOrEmpty(_configuration["ExpirateTokenTime"])? Convert.ToDouble(_configuration["ExpirateTokenTime"]) : 24;
                 Response.Cookies.Append("jwtToken", apiError.Result.Response?.AccessToken.Token, new CookieOptions
                 {
                     HttpOnly = true, 
-                    Secure = true,   
-                    Expires = apiError.Result.Response?.AccessToken.ExpiryTokenDate.AddHours(tokentime)
+                    Secure = true  
+                    
                 });
                                 
-                return RedirectToAction("Dashboard", "Home");
+                return RedirectToAction("Index", "Home");
             }
 
             ViewBag.Message = "Invalid OTP. Please try again.";

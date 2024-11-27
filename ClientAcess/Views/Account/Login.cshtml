@@ -2,9 +2,8 @@
 
 <div class="container">
     <h2>Login</h2>
-    
-    <div asp-validation-summary="All" class="text-danger"></div>
 
+   
     <form asp-action="Login">
         <div class="form-group">
             <label asp-for="Username"></label>
@@ -14,18 +13,42 @@
 
         <div class="form-group">
             <label asp-for="Password"></label>
-            <input asp-for="Password" type="password" class="form-control" />
+            <div class="input-group">
+                <input asp-for="Password" type="password" id="PasswordField" class="form-control" />
+                <button type="button" class="btn btn-outline-secondary" id="TogglePasswordButton">
+                    Show
+                </button>
+            </div>
             <span asp-validation-for="Password" class="text-danger"></span>
         </div>
 
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
+
     @if (ViewBag.Message != null)
     {
         <div class="alert alert-danger mt-3">
             @ViewBag.Message
         </div>
     }
+
     <a href="@Url.Action("ForgotPassword", "Account")">Forgot Password</a>
     <a href="@Url.Action("Register", "Account")">Register</a>
 </div>
+
+@section Scripts {
+    <script>
+        const togglePasswordButton = document.getElementById('TogglePasswordButton');
+        const passwordField = document.getElementById('PasswordField');
+
+        togglePasswordButton.addEventListener('click', function () {
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                togglePasswordButton.textContent = 'Hide';
+            } else {
+                passwordField.type = 'password';
+                togglePasswordButton.textContent = 'Show';
+            }
+        });
+    </script>
+}

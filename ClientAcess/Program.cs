@@ -1,3 +1,5 @@
+using System.Net;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -7,7 +9,13 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient("ApiClient", client =>
 {
     client.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
-});
+})
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        CookieContainer = new CookieContainer()
+    });
+
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 

@@ -13,5 +13,5 @@ export EmailConfiguration__Password="your-email-password"
 
 definir regras da password
 definir no appsettings o endpoint do cliente
-definir tempo de token no clientapp
+definir configurações do token de acesso
 definir BaseAddress no clientapp para a api

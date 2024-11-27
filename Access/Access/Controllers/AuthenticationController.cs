@@ -9,6 +9,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Response = Access.Models.Response;
 using Access.Constants;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace Access.Controllers
 {
@@ -191,17 +194,11 @@ namespace Access.Controllers
                 _logger.LogInformation($"OTP sent to {user.Email}.");
                 return Ok(new Response { IsSuccess = loginOtpResponse.IsSuccess, Status = ApiCode.Success, Message = $"We have sent an OTP to your email {user.Email}" });
             }
-
-            if (user != null && await _userManager.CheckPasswordAsync(user, loginModel.Password))
+            else
             {
-                var serviceResponse = await _user.GetJwtTokenAsync(user);
-                _logger.LogInformation($"User {user.Email} logged in successfully.");
-                return Ok(new Response { Result  = serviceResponse, IsSuccess = true, Message = "Logged in successfully.", Status = ApiCode.Success }  );
-            }
-
-
-            _logger.LogWarning($"Invalid login attempt for {loginModel.Username}.");
-            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid credentials" , Status = ApiCode.InvalidCredentials });
+                _logger.LogWarning($"Two Factor disabled {loginModel.Username}.");
+                return Unauthorized(new Response { IsSuccess = false, Message = "Two Factor disabled", Status = ApiCode.InvalidCredentials });
+            }            
         }
 
         [HttpPost]
@@ -294,5 +291,44 @@ namespace Access.Controllers
             _logger.LogWarning($"Failed token refresh attempt for {tokens.Username}.");
             return Unauthorized(new Response { Status = ApiCode.RefreshTokenExpired, IsSuccess = false, Message = "Invalid token or refresh token." });
         }
+
+
+        [HttpGet]
+        [Route("ValidateToken")]
+        public async Task<IActionResult> ValidateToken()
+        {
+            var authHeader = Request.Headers["Authorization"].ToString();
+            if (string.IsNullOrEmpty(authHeader))
+            {
+                return Unauthorized(new Response { IsSuccess = false, Message = "Token missing", Status = ApiCode.TokenMissing });
+            }
+
+            var token = authHeader.Replace("Bearer ", string.Empty);
+
+            try
+            {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"])),
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidIssuer = _configuration["JWT:ValidIssuer"],
+                    ValidAudience = _configuration["JWT:ValidAudience"],
+                    ValidateLifetime = true, // Enforce expiration check
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
+                return Ok(new Response { IsSuccess = true, Message = "Token is valid", Status = ApiCode.Success });
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new Response { IsSuccess = false, Message = ex.Message, Status = ApiCode.TokenInvalid });
+            }
+        }
+
+
     }
 }

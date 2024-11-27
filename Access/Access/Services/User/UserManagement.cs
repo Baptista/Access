@@ -137,8 +137,29 @@ namespace Access.Services.User
                         InternalCode= ApiCode.EmailNotConfirmed
                     };
                 }
+                var isValid = await _userManager.CheckPasswordAsync(user, loginModel.Password);
+                if (!isValid)
+                {
+                    return new ApiResponse<LoginOtpResponse>
+                    {
+                        IsSuccess = false,
+                        StatusCode = 401,
+                        Message = "Invalid Password",
+                        InternalCode = ApiCode.InvalidLogin
+                    };
+                }
+                var islocked = await _userManager.IsLockedOutAsync(user);
+                if (islocked)
+                {
+                    return new ApiResponse<LoginOtpResponse>
+                    {
+                        IsSuccess = false,
+                        StatusCode = 401,
+                        Message = "User Locked",
+                        InternalCode = ApiCode.InvalidLogin
+                    };
+                }
 
-                // Check if the user is locked out due to multiple failed attempts
                 var result = await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
                 if (result.IsLockedOut)
                 {
@@ -151,7 +172,7 @@ namespace Access.Services.User
                     };
                 }
 
-                if (user.TwoFactorEnabled)
+                if (result.RequiresTwoFactor)
                 {
                     var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
                     return new ApiResponse<LoginOtpResponse>
@@ -299,16 +320,14 @@ namespace Access.Services.User
         {
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
             _ = int.TryParse(_configuration["JWT:TokenValidityInMinutes"], out int tokenValidityInMinutes);
-            var expirationTimeUtc = DateTime.UtcNow.AddMinutes(tokenValidityInMinutes);
-            var localTimeZone = TimeZoneInfo.Local;
-            var expirationTimeInLocalTimeZone = TimeZoneInfo.ConvertTimeFromUtc(expirationTimeUtc, localTimeZone);
-
+            var expirationTime = DateTime.Now.AddMinutes(tokenValidityInMinutes);
+            
             try
             {
                 var token = new JwtSecurityToken(
                     issuer: _configuration["JWT:ValidIssuer"],
                     audience: _configuration["JWT:ValidAudience"],
-                    expires: expirationTimeInLocalTimeZone,
+                    expires: expirationTime,
                     claims: authClaims,
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );

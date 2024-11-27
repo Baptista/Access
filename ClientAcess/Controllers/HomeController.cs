@@ -1,9 +1,11 @@
 using ClientAcess.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 
 namespace ClientAcess.Controllers
 {
+   
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
@@ -14,9 +16,19 @@ namespace ClientAcess.Controllers
         }
 
         public IActionResult Index()
-        {
+        {           
+            // Check if JWT token exists in cookies
+            Request.Cookies.TryGetValue("jwtToken", out var token);
+            if (string.IsNullOrEmpty(token))
+            {
+                // If token is missing, redirect to login
+                return RedirectToAction("Login", "Account");
+            }
+
+            // Token exists, allow access
             return View();
         }
+   
 
         public IActionResult Privacy()
         {

@@ -36,10 +36,13 @@ builder.Services.AddScoped<IUserManagement, UserManagement>();
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     // Configurar opções de senha, bloqueio, etc. se necessário
-    options.Password.RequireDigit = true;
-    options.Password.RequiredLength = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = true;
+    //options.Password.RequireDigit = true;
+    //options.Password.RequiredLength = 6;
+    //options.Password.RequireNonAlphanumeric = true;
+    //options.Password.RequireUppercase = true;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5); // Lockout duration
+    options.Lockout.MaxFailedAccessAttempts = 5; // Maximum failed attempts
+    options.Lockout.AllowedForNewUsers = true; // Enable lockout for new users
 })
     .AddEntityFrameworkStores<DataContext>()
     .AddDefaultTokenProviders(); // Registrar UserManager, SignInManager e RoleManager
@@ -61,6 +64,8 @@ builder.Services.AddRateLimiter(options =>
         config.QueueLimit = 2;  // Requests beyond this limit are rejected immediately
     });
 });
+
+
 
 // Configure Serilog for file logging
 Log.Logger = new LoggerConfiguration()

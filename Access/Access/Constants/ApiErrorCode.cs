@@ -28,6 +28,8 @@
 
         EmailNotFound = 1024,
         FailedResetPassword = 1025,
-        FailedRefreshToken = 1026
+        FailedRefreshToken = 1026,
+        TokenMissing = 1027,
+        TokenInvalid = 1028
     }
 }
