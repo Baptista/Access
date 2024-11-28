@@ -31,7 +31,7 @@ namespace ClientAcess.Controllers
 
             if (response.IsSuccessStatusCode)
             {
-                return RedirectToAction("Login");
+                return RedirectToAction("SendEmail");                
             }
             var errorContent = await response.Content.ReadAsStringAsync();
             var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
@@ -45,6 +45,35 @@ namespace ClientAcess.Controllers
                 ViewBag.Message = "Error registering user";                
             }
             return View(model);
+        }
+
+        public IActionResult SendEmail()
+        {
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ConfirmEmail(string token, string email)
+        {
+            ConfirmModel confirmModel = new ConfirmModel();
+            confirmModel.email = email;
+            confirmModel.token = token;
+            var response = await _httpClient.PostAsJsonAsync("ConfirmEmail",confirmModel);
+            if (response.IsSuccessStatusCode)
+            {
+                return RedirectToAction("Login");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
+
+                if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
+                {
+                    ViewBag.Message = apiError.Message;
+                }
+                return View();
+            }
         }
 
         [HttpGet]

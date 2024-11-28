@@ -1,5 +1,4 @@
-﻿
-@{
+﻿@{
     ViewData["Title"] = "Register";
 }
 
@@ -7,7 +6,7 @@
 
 <div class="container">
     <h2>Register</h2>
-    
+
     <form asp-action="Register">
         <div class="form-group">
             <label asp-for="Username"></label>
@@ -23,19 +22,30 @@
 
         <div class="form-group">
             <label asp-for="Password"></label>
-            <input asp-for="Password" type="password" class="form-control" id="password" />
+            <div class="input-group">
+                <input asp-for="Password" type="password" class="form-control" id="password" />
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="togglePassword">Show</button>
+                </div>
+            </div>
             <span asp-validation-for="Password" class="text-danger"></span>
             <div id="passwordStrength" class="text-info mt-1"></div> <!-- Password strength indicator -->
         </div>
 
         <div class="form-group">
             <label asp-for="ConfirmPassword"></label>
-            <input asp-for="ConfirmPassword" type="password" class="form-control" />
+            <div class="input-group">
+                <input asp-for="ConfirmPassword" type="password" class="form-control" id="confirmPassword" />
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleConfirmPassword">Show</button>
+                </div>
+            </div>
             <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
         </div>
 
         <button type="submit" class="btn btn-primary">Register</button>
     </form>
+
     @if (ViewBag.Message != null)
     {
         <div class="alert alert-danger mt-3">
@@ -47,20 +57,20 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        document.getElementById("password").addEventListener("input", function () {
-            const password = this.value;
-            const strengthIndicator = document.getElementById("passwordStrength");
+        // Toggle password visibility for the 'Password' field
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            const passwordField = document.getElementById('password');
+            const type = passwordField.type === 'password' ? 'text' : 'password';
+            passwordField.type = type;
+            this.textContent = type === 'password' ? 'Show' : 'Hide';
+        });
 
-            if (password.length < 6) {
-                strengthIndicator.textContent = "Weak";
-                strengthIndicator.className = "text-danger";
-            } else if (password.length < 10) {
-                strengthIndicator.textContent = "Medium";
-                strengthIndicator.className = "text-warning";
-            } else {
-                strengthIndicator.textContent = "Strong";
-                strengthIndicator.className = "text-success";
-            }
+        // Toggle password visibility for the 'ConfirmPassword' field
+        document.getElementById('toggleConfirmPassword').addEventListener('click', function () {
+            const confirmPasswordField = document.getElementById('confirmPassword');
+            const type = confirmPasswordField.type === 'password' ? 'text' : 'password';
+            confirmPasswordField.type = type;
+            this.textContent = type === 'password' ? 'Show' : 'Hide';
         });
     </script>
 }

@@ -56,14 +56,15 @@ namespace Access.Controllers
                 {
                     // Resend confirmation email since the user exists but hasn't confirmed their email
                     var token = await _userManager.GenerateEmailConfirmationTokenAsync(existingUser);
+                                        
+                    var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
-                    // Create the confirmation link
-                    var confirmationLink = Url.Action(nameof(ConfirmEmail), "Authentication",
-                        new { token, email = registerUser.Email }, Request.Scheme);
+                    var message = new Message(
+                        new string[] { registerUser.Email! },
+                        "Resend Confirm Email",
+                        $"Please confirm your email by clicking on the following link: {clientResetLink}"
+                    );
 
-                    // Send the confirmation email again
-                    var message = new Message(new[] { registerUser.Email }, "Resend Confirmation Email",
-                                              $"Please confirm your email by clicking on the following link: {confirmationLink}");
                     var result = await _emailService.SendEmailAsync(message);
 
                     if (result.Success)
@@ -103,12 +104,14 @@ namespace Access.Controllers
             // Generate confirmation token for new user
             var tokenNewUser = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
-            // Create confirmation link
-            var confirmationLinkNewUser = Url.Action(nameof(ConfirmEmail), "Authentication",
-                new { token = tokenNewUser, email = registerUser.Email }, Request.Scheme);
+            var clientResetLinkNewUser = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(tokenNewUser)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
-            // Send confirmation email
-            var messageNewUser = new Message(new[] { registerUser.Email }, "Confirm your email", confirmationLinkNewUser);
+            var messageNewUser = new Message(
+                new string[] { registerUser.Email! },
+                "Confirm Email",
+                $"Please confirm your email by clicking on the following link: {clientResetLinkNewUser}"
+            );
+                        
             var sendResult = await _emailService.SendEmailAsync(messageNewUser);
 
             if (sendResult.Success)
@@ -120,24 +123,24 @@ namespace Access.Controllers
             return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later.", Status = ApiCode.FailSendEmail });
         }
 
-        [HttpGet("ConfirmEmail")]
-        public async Task<IActionResult> ConfirmEmail(string token, string email)
+        [HttpPost("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail(ConfirmModel confirmModel)
         {
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByEmailAsync(confirmModel.email);
             if (user == null)
             {
-                _logger.LogWarning($"Email confirmation failed. User {email} does not exist.");
+                _logger.LogWarning($"Email confirmation failed. User {confirmModel.email} does not exist.");
                 return NotFound(new Response { Status = ApiCode.UserNotFound, IsSuccess = false, Message = "This user does not exist!" });
             }
 
-            var result = await _userManager.ConfirmEmailAsync(user, token);
+            var result = await _userManager.ConfirmEmailAsync(user, confirmModel.token);
             if (result.Succeeded)
             {
-                _logger.LogInformation($"Email confirmed for user {email}.");
+                _logger.LogInformation($"Email confirmed for user {confirmModel.email}.");
                 return Ok(new Response { Status = ApiCode.Success, IsSuccess = true, Message = "Email verified successfully" });
             }
 
-            _logger.LogWarning($"Email confirmation failed for {email}. Invalid or expired token.");
+            _logger.LogWarning($"Email confirmation failed for {confirmModel.email}. Invalid or expired token.");
             return BadRequest(new Response { Status = ApiCode.ExpiredTokenEmail, IsSuccess = false, Message = "Invalid or expired token." });
         }
 
