@@ -46,7 +46,12 @@ namespace Access.Controllers
                 _logger.LogWarning("Invalid registration attempt.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
-
+            if(!registerUser.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Email it´s not from keydevteam.com");
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
+            }
+            
             // Check if the user already exists by email
             var existingUser = await _userManager.FindByEmailAsync(registerUser.Email);
             if (existingUser != null)
@@ -154,7 +159,6 @@ namespace Access.Controllers
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" , Status = ApiCode.InvalidInputData});
             }
 
-
             var loginOtpResponse = await _user.GetOtpByLoginAsync(loginModel);
             if (!loginOtpResponse.IsSuccess)
             {
@@ -228,7 +232,11 @@ namespace Access.Controllers
                 _logger.LogWarning("Forgot password attempt with missing email.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired  });
             }
-
+            if (!forgotPasswordModel.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Email it´s not from keydevteam.com");
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
+            }
             var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
             if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
             {
@@ -260,7 +268,11 @@ namespace Access.Controllers
                 _logger.LogWarning("Invalid reset password attempt.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData});
             }
-
+            if (!resetPasswordModel.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Email it´s not from keydevteam.com");
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
+            }
             var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
             if (user == null)
             {
