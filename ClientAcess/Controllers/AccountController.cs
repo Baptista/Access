@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 
 namespace ClientAcess.Controllers
-{
+{ 
     public class AccountController : Controller
     {
         private readonly HttpClient _httpClient;
