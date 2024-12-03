@@ -83,8 +83,17 @@ namespace ClientAcess.Controllers
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var response = await _httpClient.GetAsync("ValidateToken");
-                if(response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
+                {                    
                     return RedirectToAction("Index", "Home");
+                }
+                else
+                {
+                    Response.Cookies.Append("jwtToken", "", new CookieOptions
+                    {
+                        Expires = DateTime.UtcNow.AddDays(-1) // Expire the cookie
+                    });
+                }
             }
             return View(); 
         }
@@ -197,6 +206,6 @@ namespace ClientAcess.Controllers
 
             ViewBag.Message = "Invalid OTP. Please try again.";
             return View(model);
-        }
+        }        
     }
 }

@@ -16,19 +16,9 @@ namespace ClientAcess.Controllers
         }
 
         public IActionResult Index()
-        {           
-            // Check if JWT token exists in cookies
-            Request.Cookies.TryGetValue("jwtToken", out var token);
-            if (string.IsNullOrEmpty(token))
-            {
-                // If token is missing, redirect to login
-                return RedirectToAction("Login", "Account");
-            }
-
-            // Token exists, allow access
+        {
             return View();
         }
-   
 
         public IActionResult Privacy()
         {
@@ -38,7 +28,7 @@ namespace ClientAcess.Controllers
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            return View();
         }
     }
 }
