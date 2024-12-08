@@ -1,9 +1,10 @@
 ﻿using Access.Constants;
 using Access.Models;
-using MimeKit;
-using MailKit.Net.Smtp;
+//using MimeKit;
+//using MailKit.Net.Smtp;
 using Polly.Retry;
 using Polly;
+using System.Net.Mail;
 //using System.Net.Mail;
 
 namespace Access.Services.Email
@@ -48,47 +49,36 @@ namespace Access.Services.Email
             }
         }
 
-        private MimeMessage CreateEmailMessage(Message message)
+        private MailMessage CreateEmailMessage(Message message)
         {
-            var emailMessage = new MimeMessage();
-            emailMessage.From.Add(new MailboxAddress("email", _emailConfig.From));
-            emailMessage.To.AddRange(message.To);
+            var emailMessage = new MailMessage();
+            emailMessage.From = new MailAddress(_emailConfig.From);            
+            emailMessage.To.Add(message.To);
             emailMessage.Subject = message.Subject;
-            emailMessage.Body = new TextPart(MimeKit.Text.TextFormat.Text) { Text = message.Content };
+            emailMessage.Body = message.Content;
 
             return emailMessage;
         }
 
-        private async Task SendAsync(MimeMessage mailMessage)
+        private async Task SendAsync(MailMessage mailMessage)
         {
-            using var client = new SmtpClient();
+            using var client = new SmtpClient(_emailConfig.SmtpServer);
             try
             {
-                await client.ConnectAsync(_emailConfig.SmtpServer, _emailConfig.Port, true);
-                client.AuthenticationMechanisms.Remove("XOAUTH2");
-                await client.AuthenticateAsync(_emailConfig.UserName, _emailConfig.Password);
+                //await client.ConnectAsync(_emailConfig.SmtpServer, _emailConfig.Port, true);
+                //client.AuthenticationMechanisms.Remove("XOAUTH2");
+                //await client.AuthenticateAsync(_emailConfig.UserName, _emailConfig.Password);
 
-                await client.SendAsync(mailMessage);
+                client.Send(mailMessage);
                 _logger.LogInformation("Email sent successfully.");
-            }
-            catch (SmtpCommandException smtpEx)
-            {
-                _logger.LogError($"SMTP Command Error: {smtpEx.Message} (StatusCode: {smtpEx.StatusCode})");
-                throw; // Rethrow to ensure Polly handles the retries
-            }
-            catch (SmtpProtocolException smtpProtEx)
-            {
-                _logger.LogError($"SMTP Protocol Error: {smtpProtEx.Message}");
-                throw; // Rethrow to ensure Polly handles the retries
-            }
+            }            
             catch (Exception ex)
             {
                 _logger.LogError($"Unexpected Error: {ex.Message}");
                 throw; // Rethrow to ensure Polly handles the retries
             }
             finally
-            {
-                await client.DisconnectAsync(true);
+            {                
                 client.Dispose();
             }
         }

@@ -1,13 +1,37 @@
 ﻿using iTextSharp.text.pdf;
 using iTextSharp.text;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
+using System.Net.Http.Headers;
 
 namespace ClientAcess.Controllers
 {
     public class VacationController : Controller
     {
-        public IActionResult Index()
+        private readonly HttpClient _httpClient;
+        public VacationController(HttpClient httpClient)
         {
+            _httpClient = httpClient;
+            _httpClient.BaseAddress = new Uri("https://accessapi.keydevteam.com/api/authentication/");
+        }
+        public async Task<IActionResult> Index()
+        {
+            Request.Cookies.TryGetValue("jwtToken", out var token);
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _httpClient.GetAsync("ValidateToken");
+                if (!response.IsSuccessStatusCode)
+                {
+                    Response.Cookies.Append("jwtToken", "", new CookieOptions
+                    {
+                        Expires = DateTime.UtcNow.AddDays(-1) // Expire the cookie
+                    });
+                    return RedirectToAction("Login", "Account");
+                }
+
+            }
+
             int currentYear = DateTime.Now.Year;
             return View(currentYear);
         }

@@ -13,7 +13,7 @@ namespace ClientAcess.Controllers
         public KmsController(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
+            _httpClient.BaseAddress = new Uri("https://accessapi.keydevteam.com/api/authentication/");
         }
         public async Task<IActionResult> Index()
         {

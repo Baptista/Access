@@ -12,6 +12,9 @@ using Access.Constants;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.ComponentModel;
+using Polly;
+using Microsoft.EntityFrameworkCore;
 
 namespace Access.Controllers
 {
@@ -24,18 +27,58 @@ namespace Access.Controllers
         private readonly IUserManagement _user;
         private readonly ILogger<AuthenticationController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly DataContext _context;
         public AuthenticationController(UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IUserManagement user,
             IConfiguration configuration,
-            ILogger<AuthenticationController> logger)
+            ILogger<AuthenticationController> logger,
+            DataContext context)
         {
             _userManager = userManager;
             _emailService = emailService;
             _user = user;
             _logger = logger;
             _configuration = configuration;
+            _context = context;
         }
+
+        [HttpGet("migrate")]
+        public IActionResult ApplyMigrations()
+        {
+            try
+            {
+                _context.Database.Migrate();
+                return Ok("Migrations applied successfully.");
+            }
+            catch (Exception ex) {
+                _logger.LogError(ex.Message);
+                return Ok("Error migrate");
+            }
+        }
+
+        [HttpGet]
+        [Route("Version")]
+        public string Version()
+        {
+            return "1.0.0.0";
+        }
+        [HttpGet]
+        [Route("Teste")]
+        public string Teste()
+        {
+            try
+            {
+                var a = _userManager.FindByEmailAsync("bruno_baptista86@hotmail.com");
+                return a.Result.UserName;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+                return "";
+            }
+        }
+
 
         [HttpPost]
         [Route("Register")]
@@ -65,7 +108,7 @@ namespace Access.Controllers
                     var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
                     var message = new Message(
-                        new string[] { registerUser.Email! },
+                        registerUser.Email! ,
                         "Resend Confirm Email",
                         $"Please confirm your email by clicking on the following link: {clientResetLink}"
                     );
@@ -112,7 +155,7 @@ namespace Access.Controllers
             var clientResetLinkNewUser = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(tokenNewUser)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
             var messageNewUser = new Message(
-                new string[] { registerUser.Email! },
+                registerUser.Email!,
                 "Confirm Email",
                 $"Please confirm your email by clicking on the following link: {clientResetLinkNewUser}"
             );
@@ -173,7 +216,7 @@ namespace Access.Controllers
                         new { token = tokenNewUser, email = loginuser.Email }, Request.Scheme);
 
                     // Send confirmation email
-                    var messageNewUser = new Message(new[] { loginuser.Email }, "Confirm your email", confirmationLinkNewUser);
+                    var messageNewUser = new Message(loginuser.Email , "Confirm your email", confirmationLinkNewUser);
                     var sendResult = await _emailService.SendEmailAsync(messageNewUser);
                 }
 
@@ -188,7 +231,7 @@ namespace Access.Controllers
             if (user.TwoFactorEnabled)
             {
                 var token = loginOtpResponse.Response.Token;
-                var message = new Message(new string[] { user.Email! }, "OTP Confirmation", token);
+                var message = new Message(user.Email!, "OTP Confirmation", token);
                 var emailResult = await _emailService.SendEmailAsync(message);
 
                 if (!emailResult.Success)
@@ -249,7 +292,7 @@ namespace Access.Controllers
             var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ResetPassword?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(forgotPasswordModel.Email)}";
 
             var message = new Message(
-                new string[] { forgotPasswordModel.Email! },
+                forgotPasswordModel.Email! ,
                 "Password Reset Request",
                 $"Please reset your password by clicking this link: {clientResetLink}"
             );

@@ -8,7 +8,7 @@ builder.Services.AddControllersWithViews();
 // Register HttpClient with a base address
 builder.Services.AddHttpClient("ApiClient", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
+    client.BaseAddress = new Uri("https://accessapi.keydevteam.com/api/authentication/");
 })
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {

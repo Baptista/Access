@@ -90,16 +90,17 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Condições para desenvolvimento
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+//}
+
 
 // Mapear endpoints da API Identity
-app.UseHttpsRedirection();
-app.UseAuthentication(); // Usar autenticação antes da autorização
-app.UseAuthorization();
+//app.UseHttpsRedirection();
+//app.UseAuthentication(); // Usar autenticação antes da autorização
+//app.UseAuthorization();
 
 // Apply the rate limiter globally
 app.UseRateLimiter();

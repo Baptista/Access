@@ -15,7 +15,7 @@ namespace ClientAcess.Controllers
             IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
+            _httpClient.BaseAddress = new Uri("https://accessapi.keydevteam.com/api/authentication/");
             _configuration = configuration;
         }
         [HttpGet]
