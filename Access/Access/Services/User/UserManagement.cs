@@ -276,6 +276,7 @@ namespace Access.Services.User
                     InternalCode = ApiCode.UserNotFound
                 };
             }
+            
             var userotp = await _userManager.VerifyTwoFactorTokenAsync(user,"Email",otp);
             if (!userotp)
             {
@@ -288,7 +289,7 @@ namespace Access.Services.User
                 };
             }
             var signIn = await _signInManager.TwoFactorSignInAsync("Email", otp, false, false);
-            if (signIn.Succeeded && user != null)
+            if (signIn.Succeeded)
             {
                 return await GetJwtTokenAsync(user);
             }
