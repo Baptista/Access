@@ -3,6 +3,7 @@
     public enum ApiCode
     {
         Success = 0,
+        Error = 1,
         EmailNotConfirmed = 1003,        
         FailedToAssignRole = 1004,
         UserAlreadyExists = 1005,
@@ -31,5 +32,7 @@
         FailedRefreshToken = 1026,
         TokenMissing = 1027,
         TokenInvalid = 1028
+
+
     }
 }

@@ -266,6 +266,27 @@ namespace Access.Services.User
         public async Task<ApiResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName)
         {
             var user = await _userManager.FindByNameAsync(userName);
+            if (user == null)
+            {
+                return new ApiResponse<LoginResponse>
+                {
+                    IsSuccess = false,
+                    StatusCode = 401,
+                    Message = "Invalid userName",
+                    InternalCode = ApiCode.UserNotFound
+                };
+            }
+            var userotp = await _userManager.VerifyTwoFactorTokenAsync(user,"Email",otp);
+            if (!userotp)
+            {
+                return new ApiResponse<LoginResponse>
+                {
+                    IsSuccess = false,
+                    StatusCode = 401,
+                    Message = "Invalid OTP",
+                    InternalCode = ApiCode.InvalidOTP
+                };
+            }
             var signIn = await _signInManager.TwoFactorSignInAsync("Email", otp, false, false);
             if (signIn.Succeeded && user != null)
             {
@@ -275,9 +296,9 @@ namespace Access.Services.User
             return new ApiResponse<LoginResponse>
             {
                 IsSuccess = false,
-                StatusCode = 400,
-                Message = "Invalid OTP",
-                InternalCode = ApiCode.InvalidOTP
+                StatusCode = 500,
+                Message = "Internal server error",
+                InternalCode = ApiCode.Error
             };
         }
 
