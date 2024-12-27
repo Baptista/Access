@@ -223,7 +223,8 @@ namespace Access.Controllers
                 return StatusCode(loginOtpResponse.StatusCode, new Response
                 {
                     IsSuccess = false,
-                    Message = loginOtpResponse.Message
+                    Message = loginOtpResponse.Message,
+                    Status = loginOtpResponse.InternalCode
                 });
             }
 
@@ -238,7 +239,7 @@ namespace Access.Controllers
                 {
                     _logger.LogError($"Failed to send OTP email to {user.Email}.");
                     return StatusCode(StatusCodes.Status500InternalServerError,
-                                      new Response { IsSuccess = false, Message = "Failed to send OTP email. Please try again later.", Status = ApiCode.FailSendOTP });
+                                      new Response { IsSuccess = false, Message = "Failed to send OTP email. Please try again later.", Status = ApiCode.FailSendEmail });
                 }
 
                 _logger.LogInformation($"OTP sent to {user.Email}.");
@@ -284,7 +285,7 @@ namespace Access.Controllers
             if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
             {
                 _logger.LogInformation($"Password reset request for unconfirmed or non-existent user {forgotPasswordModel.Email}.");
-                return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.ResetLink });
+                return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.Success });
             }
 
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);

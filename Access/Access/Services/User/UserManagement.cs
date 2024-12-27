@@ -175,6 +175,8 @@ namespace Access.Services.User
                 if (result.RequiresTwoFactor)
                 {
                     var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
+                    await _userManager.SetAuthenticationTokenAsync(user, "Email", "OTP", token); // Store the token explicitly
+
                     return new ApiResponse<LoginOtpResponse>
                     {
                         Response = new LoginOtpResponse
@@ -276,9 +278,9 @@ namespace Access.Services.User
                     InternalCode = ApiCode.UserNotFound
                 };
             }
-            
-            var userotp = await _userManager.VerifyTwoFactorTokenAsync(user,"Email",otp);
-            if (!userotp)
+
+            var token = await _userManager.GetAuthenticationTokenAsync(user, "Email", "OTP");
+            if (string.IsNullOrEmpty(token) || token != otp)
             {
                 return new ApiResponse<LoginResponse>
                 {
@@ -288,19 +290,24 @@ namespace Access.Services.User
                     InternalCode = ApiCode.InvalidOTP
                 };
             }
-            var signIn = await _signInManager.TwoFactorSignInAsync("Email", otp, false, false);
-            if (signIn.Succeeded)
+
+            // Validate the OTP and remove it after use
+            var isOtpValid = await _userManager.VerifyTwoFactorTokenAsync(user, "Email", otp);
+            if (isOtpValid)
             {
+                await _userManager.RemoveAuthenticationTokenAsync(user, "Email", "OTP"); // Invalidate OTP
                 return await GetJwtTokenAsync(user);
             }
-
-            return new ApiResponse<LoginResponse>
+            else
             {
-                IsSuccess = false,
-                StatusCode = 500,
-                Message = "Internal server error",
-                InternalCode = ApiCode.Error
-            };
+                return new ApiResponse<LoginResponse>
+                {
+                    IsSuccess = false,
+                    StatusCode = 401,
+                    Message = "Invalid OTP",
+                    InternalCode = ApiCode.InvalidOTP
+                };
+            }
         }
 
         public async Task<ApiResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens)
