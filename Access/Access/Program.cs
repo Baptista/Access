@@ -90,11 +90,11 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Condições para desenvolvimento
-//if (app.Environment.IsDevelopment())
-//{
+if (app.Environment.IsDevelopment())
+{
     app.UseSwagger();
     app.UseSwaggerUI();
-//}
+}
 
 
 // Mapear endpoints da API Identity

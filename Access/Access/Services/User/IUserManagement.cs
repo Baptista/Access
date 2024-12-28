@@ -6,11 +6,11 @@ namespace Access.Services.User
 {
     public interface IUserManagement
     {
-        Task<ApiResponse<CreateUserResponse>> CreateUserWithTokenAsync(RegisterUser registerUser);
-        Task<ApiResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user);
-        Task<ApiResponse<LoginOtpResponse>> GetOtpByLoginAsync(LoginModel loginModel);
-        Task<ApiResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user);
-        Task<ApiResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName);
-        Task<ApiResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens);
+        Task<UserResponse<CreateUserResponse>> CreateUserWithTokenAsync(RegisterUser registerUser);
+        Task<UserResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user);
+        Task<UserResponse<LoginOtpResponse>> GetOtpByLoginAsync(LoginModel loginModel);
+        Task<UserResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user);
+        Task<UserResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName);
+        //Task<UserResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens);
     }
 }

@@ -194,7 +194,7 @@ namespace ClientAcess.Controllers
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
-                Response.Cookies.Append("jwtToken", apiError.Result.Response?.AccessToken.Token, new CookieOptions
+                Response.Cookies.Append("jwtToken", apiError.Result.AccessToken.Token, new CookieOptions
                 {
                     HttpOnly = true, 
                     Secure = true  

@@ -63,21 +63,21 @@ namespace Access.Controllers
         {
             return "1.0.0.0";
         }
-        [HttpGet]
-        [Route("Teste")]
-        public string Teste()
-        {
-            try
-            {
-                var a = _userManager.FindByEmailAsync("bruno_baptista86@hotmail.com");
-                return a.Result.UserName;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message);
-                return "";
-            }
-        }
+        //[HttpGet]
+        //[Route("Teste")]
+        //public string Teste()
+        //{
+        //    try
+        //    {
+        //        var a = _userManager.FindByEmailAsync("bruno_baptista86@hotmail.com");
+        //        return a.Result.UserName;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex.Message);
+        //        return "";
+        //    }
+        //}
 
 
         [HttpPost]
@@ -260,7 +260,7 @@ namespace Access.Controllers
             if (jwt.IsSuccess)
             {
                 _logger.LogInformation($"User {loginWithOtpModel.UserName} successfully logged in with OTP.");
-                return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Logged in successfully.", Status = ApiCode.Success });
+                return Ok(new Response { Result = jwt.Response, IsSuccess = true, Message = "Logged in successfully.", Status = ApiCode.Success });
             }
 
             _logger.LogWarning($"Invalid OTP attempt for {loginWithOtpModel.UserName}.");
@@ -336,20 +336,20 @@ namespace Access.Controllers
             return Ok(new Response { IsSuccess = true, Message = "Password has been reset successfully.", Status = ApiCode.Success });
         }
 
-        [HttpPost]
-        [Route("Refresh-Token")]
-        public async Task<IActionResult> RefreshToken(LoginResponse tokens)
-        {
-            var jwt = await _user.RenewAccessTokenAsync(tokens);
-            if (jwt.IsSuccess)
-            {
-                _logger.LogInformation($"Token refreshed successfully for {tokens.Username}.");
-                return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Token refreshed successfully.", Status = ApiCode.Success });
-            }
+        //[HttpPost]
+        //[Route("Refresh-Token")]
+        //public async Task<IActionResult> RefreshToken(LoginResponse tokens)
+        //{
+        //    var jwt = await _user.RenewAccessTokenAsync(tokens);
+        //    if (jwt.IsSuccess)
+        //    {
+        //        _logger.LogInformation($"Token refreshed successfully for {tokens.Username}.");
+        //        return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Token refreshed successfully.", Status = ApiCode.Success });
+        //    }
 
-            _logger.LogWarning($"Failed token refresh attempt for {tokens.Username}.");
-            return Unauthorized(new Response { Status = ApiCode.RefreshTokenExpired, IsSuccess = false, Message = "Invalid token or refresh token." });
-        }
+        //    _logger.LogWarning($"Failed token refresh attempt for {tokens.Username}.");
+        //    return Unauthorized(new Response { Status = ApiCode.RefreshTokenExpired, IsSuccess = false, Message = "Invalid token or refresh token." });
+        //}
 
 
         [HttpGet]

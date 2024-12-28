@@ -2,7 +2,7 @@
 
 namespace Access.Models
 {
-    public class ApiResponse<T>
+    public class UserResponse<T>
     {
         public bool IsSuccess { get; set; }
         public string? Message { get; set; }

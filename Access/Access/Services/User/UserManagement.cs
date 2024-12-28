@@ -33,7 +33,7 @@ namespace Access.Services.User
             _logger = logger;
         }
 
-        public async Task<ApiResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user)
+        public async Task<UserResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user)
         {
             var assignedRole = new List<string>();
             foreach (var role in roles)
@@ -50,7 +50,7 @@ namespace Access.Services.User
                         else
                         {
                             _logger.LogError($"Failed to assign role {role} to user {user.UserName}");
-                            return new ApiResponse<List<string>>
+                            return new UserResponse<List<string>>
                             {
                                 IsSuccess = false,
                                 StatusCode = 500,
@@ -62,7 +62,7 @@ namespace Access.Services.User
                 }
             }
 
-            return new ApiResponse<List<string>>
+            return new UserResponse<List<string>>
             {
                 IsSuccess = true,
                 StatusCode = 200,
@@ -72,19 +72,19 @@ namespace Access.Services.User
             };
         }
 
-        public async Task<ApiResponse<CreateUserResponse>> CreateUserWithTokenAsync(RegisterUser registerUser)
+        public async Task<UserResponse<CreateUserResponse>> CreateUserWithTokenAsync(RegisterUser registerUser)
         {
             // Check if the user or username already exists
             var userExist = await _userManager.FindByEmailAsync(registerUser.Email);
             if (userExist != null)
             {
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Email already exists!", InternalCode = ApiCode.EmailAlreadyExists };
+                return new UserResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Email already exists!", InternalCode = ApiCode.EmailAlreadyExists };
             }
 
             var usernameExist = await _userManager.FindByNameAsync(registerUser.Username);
             if (usernameExist != null)
             {
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Username already exists!" , InternalCode = ApiCode.UserAlreadyExists };
+                return new UserResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 403, Message = "Username already exists!" , InternalCode = ApiCode.UserAlreadyExists };
             }
 
             ApplicationUser user = new()
@@ -99,7 +99,7 @@ namespace Access.Services.User
             if (!result.Succeeded)
             {
                 _logger.LogError($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User creation failed" , InternalCode = ApiCode.UserCreationFailed };
+                return new UserResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "User creation failed" , InternalCode = ApiCode.UserCreationFailed };
             }
 
             // Generate email confirmation token
@@ -107,10 +107,10 @@ namespace Access.Services.User
             if (string.IsNullOrEmpty(token))
             {
                 _logger.LogError("Failed to generate email confirmation token.");
-                return new ApiResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "Token generation failed", InternalCode = ApiCode.TokenGenerationFailed };
+                return new UserResponse<CreateUserResponse> { IsSuccess = false, StatusCode = 500, Message = "Token generation failed", InternalCode = ApiCode.TokenGenerationFailed };
             }
 
-            return new ApiResponse<CreateUserResponse>
+            return new UserResponse<CreateUserResponse>
             {
                 Response = new CreateUserResponse { User = user, Token = token },
                 IsSuccess = true,
@@ -120,7 +120,7 @@ namespace Access.Services.User
             };
         }
 
-        public async Task<ApiResponse<LoginOtpResponse>> GetOtpByLoginAsync(LoginModel loginModel)
+        public async Task<UserResponse<LoginOtpResponse>> GetOtpByLoginAsync(LoginModel loginModel)
         {
             var user = await _userManager.FindByNameAsync(loginModel.Username);
             if (user != null)
@@ -129,7 +129,7 @@ namespace Access.Services.User
                 if (!await _userManager.IsEmailConfirmedAsync(user))
                 {
                     _logger.LogWarning($"Login failed for {loginModel.Username}. Email not confirmed.");
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         IsSuccess = false,
                         StatusCode = 401,
@@ -140,7 +140,7 @@ namespace Access.Services.User
                 var isValid = await _userManager.CheckPasswordAsync(user, loginModel.Password);
                 if (!isValid)
                 {
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         IsSuccess = false,
                         StatusCode = 401,
@@ -151,7 +151,7 @@ namespace Access.Services.User
                 var islocked = await _userManager.IsLockedOutAsync(user);
                 if (islocked)
                 {
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         IsSuccess = false,
                         StatusCode = 401,
@@ -163,7 +163,7 @@ namespace Access.Services.User
                 var result = await _signInManager.PasswordSignInAsync(user, loginModel.Password, false, true);
                 if (result.IsLockedOut)
                 {
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         IsSuccess = false,
                         StatusCode = 423, // Locked out status code
@@ -177,7 +177,7 @@ namespace Access.Services.User
                     var token = await _userManager.GenerateTwoFactorTokenAsync(user, "Email");
                     await _userManager.SetAuthenticationTokenAsync(user, "Email", "OTP", token); // Store the token explicitly
 
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         Response = new LoginOtpResponse
                         {
@@ -193,7 +193,7 @@ namespace Access.Services.User
                 }
                 else
                 {
-                    return new ApiResponse<LoginOtpResponse>
+                    return new UserResponse<LoginOtpResponse>
                     {
                         Response = new LoginOtpResponse
                         {
@@ -210,7 +210,7 @@ namespace Access.Services.User
             }
             else
             {
-                return new ApiResponse<LoginOtpResponse>
+                return new UserResponse<LoginOtpResponse>
                 {
                     IsSuccess = false,
                     StatusCode = 404,
@@ -220,7 +220,7 @@ namespace Access.Services.User
             }
         }
 
-        public async Task<ApiResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user)
+        public async Task<UserResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user)
         {
             var authClaims = new List<Claim>
             {
@@ -236,14 +236,10 @@ namespace Access.Services.User
 
             // Generate access and refresh tokens
             var jwtToken = GetToken(authClaims); // Access token
-            var refreshToken = GenerateRefreshToken();
-            _ = int.TryParse(_configuration["JWT:RefreshTokenValidity"], out int refreshTokenValidity);
-
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(refreshTokenValidity);
+            
             await _userManager.UpdateAsync(user);
 
-            return new ApiResponse<LoginResponse>
+            return new UserResponse<LoginResponse>
             {
                 Response = new LoginResponse
                 {
@@ -251,12 +247,7 @@ namespace Access.Services.User
                     {
                         Token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
                         ExpiryTokenDate = jwtToken.ValidTo
-                    },
-                    RefreshToken = new TokenType
-                    {
-                        Token = user.RefreshToken,
-                        ExpiryTokenDate = (DateTime)user.RefreshTokenExpiry
-                    }
+                    }                    
                 },
                 IsSuccess = true,
                 StatusCode = 200,
@@ -265,12 +256,12 @@ namespace Access.Services.User
             };
         }
 
-        public async Task<ApiResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName)
+        public async Task<UserResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName)
         {
             var user = await _userManager.FindByNameAsync(userName);
             if (user == null)
             {
-                return new ApiResponse<LoginResponse>
+                return new UserResponse<LoginResponse>
                 {
                     IsSuccess = false,
                     StatusCode = 401,
@@ -282,7 +273,7 @@ namespace Access.Services.User
             var token = await _userManager.GetAuthenticationTokenAsync(user, "Email", "OTP");
             if (string.IsNullOrEmpty(token) || token != otp)
             {
-                return new ApiResponse<LoginResponse>
+                return new UserResponse<LoginResponse>
                 {
                     IsSuccess = false,
                     StatusCode = 401,
@@ -300,7 +291,7 @@ namespace Access.Services.User
             }
             else
             {
-                return new ApiResponse<LoginResponse>
+                return new UserResponse<LoginResponse>
                 {
                     IsSuccess = false,
                     StatusCode = 401,
@@ -310,39 +301,39 @@ namespace Access.Services.User
             }
         }
 
-        public async Task<ApiResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens)
-        {
-            var accessToken = tokens.AccessToken;
-            var refreshToken = tokens.RefreshToken;
+        //public async Task<UserResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens)
+        //{
+        //    var accessToken = tokens.AccessToken;
+        //    var refreshToken = tokens.RefreshToken;
 
-            var principal = GetClaimsPrincipal(accessToken.Token);
-            var user = await _userManager.FindByNameAsync(principal.Identity.Name);
+        //    var principal = GetClaimsPrincipal(accessToken.Token);
+        //    var user = await _userManager.FindByNameAsync(principal.Identity.Name);
 
-            if (refreshToken.Token != user.RefreshToken)
-            {
-                return new ApiResponse<LoginResponse>
-                {
-                    IsSuccess = false,
-                    StatusCode = 400,
-                    Message = "Invalid refresh token",
-                    InternalCode = ApiCode.InvalidRefreshToken
-                };
-            }
+        //    if (refreshToken.Token != user.RefreshToken)
+        //    {
+        //        return new UserResponse<LoginResponse>
+        //        {
+        //            IsSuccess = false,
+        //            StatusCode = 400,
+        //            Message = "Invalid refresh token",
+        //            InternalCode = ApiCode.InvalidRefreshToken
+        //        };
+        //    }
 
-            if (refreshToken.ExpiryTokenDate <= DateTime.Now)
-            {
-                return new ApiResponse<LoginResponse>
-                {
-                    IsSuccess = false,
-                    StatusCode = 400,
-                    Message = "Refresh token expired",
-                    InternalCode = ApiCode.RefreshTokenExpired
-                };
-            }
+        //    if (refreshToken.ExpiryTokenDate <= DateTime.Now)
+        //    {
+        //        return new UserResponse<LoginResponse>
+        //        {
+        //            IsSuccess = false,
+        //            StatusCode = 400,
+        //            Message = "Refresh token expired",
+        //            InternalCode = ApiCode.RefreshTokenExpired
+        //        };
+        //    }
 
-            var response = await GetJwtTokenAsync(user);
-            return response;
-        }
+        //    var response = await GetJwtTokenAsync(user);
+        //    return response;
+        //}
 
         #region Private Methods
         private JwtSecurityToken GetToken(List<Claim> authClaims)
