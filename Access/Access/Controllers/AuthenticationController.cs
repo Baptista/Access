@@ -89,7 +89,7 @@ namespace Access.Controllers
                 _logger.LogWarning("Invalid registration attempt.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
-            if(!registerUser.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            if(!registerUser.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Email it´s not from keydevteam.com");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
