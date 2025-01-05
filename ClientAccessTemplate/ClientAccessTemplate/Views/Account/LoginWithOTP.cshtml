@@ -1,0 +1,31 @@
+﻿@model Access.Models.Authentication.LoginWithOtpModel
+
+<div class="container">
+    <h2>Login with OTP</h2>
+    <form asp-action="LoginWithOTP">
+        <div class="form-group">
+            <label asp-for="UserName"></label>
+            <input asp-for="UserName" class="form-control" readonly />
+            <span asp-validation-for="UserName" class="text-danger"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Code">OTP Code</label>
+            <input asp-for="Code" class="form-control" />
+            <span asp-validation-for="Code" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    @if (ViewBag.Message != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @ViewBag.Message
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

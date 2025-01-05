@@ -1,0 +1,76 @@
+﻿@{
+    ViewData["Title"] = "Register";
+}
+
+@model Access.Models.Authentication.RegisterModel
+
+<div class="container">
+    <h2>Register</h2>
+
+    <form asp-action="Register">
+        <div class="form-group">
+            <label asp-for="Username"></label>
+            <input asp-for="Username" class="form-control" />
+            <span asp-validation-for="Username" class="text-danger"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Email"></label>
+            <input asp-for="Email" class="form-control" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Password"></label>
+            <div class="input-group">
+                <input asp-for="Password" type="password" class="form-control" id="password" />
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="togglePassword">Show</button>
+                </div>
+            </div>
+            <span asp-validation-for="Password" class="text-danger"></span>
+            <div id="passwordStrength" class="text-info mt-1"></div> <!-- Password strength indicator -->
+        </div>
+
+        <div class="form-group">
+            <label asp-for="ConfirmPassword"></label>
+            <div class="input-group">
+                <input asp-for="ConfirmPassword" type="password" class="form-control" id="confirmPassword" />
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleConfirmPassword">Show</button>
+                </div>
+            </div>
+            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+
+    @if (ViewBag.Message != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @ViewBag.Message
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Toggle password visibility for the 'Password' field
+        document.getElementById('togglePassword').addEventListener('click', function () {
+            const passwordField = document.getElementById('password');
+            const type = passwordField.type === 'password' ? 'text' : 'password';
+            passwordField.type = type;
+            this.textContent = type === 'password' ? 'Show' : 'Hide';
+        });
+
+        // Toggle password visibility for the 'ConfirmPassword' field
+        document.getElementById('toggleConfirmPassword').addEventListener('click', function () {
+            const confirmPasswordField = document.getElementById('confirmPassword');
+            const type = confirmPasswordField.type === 'password' ? 'text' : 'password';
+            confirmPasswordField.type = type;
+            this.textContent = type === 'password' ? 'Show' : 'Hide';
+        });
+    </script>
+}
