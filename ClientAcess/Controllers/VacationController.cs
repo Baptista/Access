@@ -29,11 +29,17 @@ namespace ClientAcess.Controllers
                     });
                     return RedirectToAction("Login", "Account");
                 }
+                else
+                {
+                    int currentYear = DateTime.Now.Year;
+                    return View(currentYear);
+                }
 
             }
-
-            int currentYear = DateTime.Now.Year;
-            return View(currentYear);
+            else
+            {
+                return RedirectToAction("Login", "Account");
+            }            
         }
 
         [HttpPost]

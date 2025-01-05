@@ -30,15 +30,23 @@ namespace ClientAcess.Controllers
                     });
                     return RedirectToAction("Login", "Account");
                 }
-                    
+                else
+                {
+                    var viewModel = new TimeSheetModel
+                    {
+                        Year = DateTime.Now.Year,
+                        Month = DateTime.Now.Month
+                    };
+                    return View(viewModel);
+                }
+
+            }
+            else
+            {
+                return RedirectToAction("Login", "Account");
             }
 
-            var viewModel = new TimeSheetModel
-            {
-                Year = DateTime.Now.Year,
-                Month = DateTime.Now.Month
-            };
-            return View(viewModel);
+            
         }
 
         [HttpPost]
