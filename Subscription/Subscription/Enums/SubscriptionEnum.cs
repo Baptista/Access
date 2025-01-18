@@ -2,12 +2,10 @@
 {
     public enum SubscriptionEnum
     {
-        Platina = 1,
-        Gold = 2,        
-        Silver = 3,
+        Bronze = 1,        
         // sem bd
         // apenas contacto de email
         // sem report de tentativas de login suspeitas
-        Bronze = 4
+        
     }
 }

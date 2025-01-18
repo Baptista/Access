@@ -19,18 +19,20 @@ namespace Access.Services.User
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IConfiguration _configuration;
         private readonly ILogger<UserManagement> _logger;
-
+        private readonly HttpClient _httpClient;
         public UserManagement(UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration configuration,
-            ILogger<UserManagement> logger)
+            ILogger<UserManagement> logger,
+            HttpClient httpClient)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _signInManager = signInManager;
             _configuration = configuration;
             _logger = logger;
+            _httpClient = httpClient;
         }
 
         public async Task<UserResponse<List<string>>> AssignRoleToUserAsync(List<string> roles, ApplicationUser user)
@@ -385,6 +387,61 @@ namespace Access.Services.User
 
             return principal;
         }
+
+        public async Task<UserResponse<bool>> CheckSubscription(string username)
+        {
+            var user = await _userManager.FindByNameAsync(username);
+            if (user == null)
+            {
+                return new UserResponse<bool>
+                {
+                    IsSuccess = false,
+                    StatusCode = 401,
+                    Message = "User does not exist.",
+                    InternalCode = ApiCode.UserNotFound,
+                    Response = false
+                };
+            }
+            
+            var emailDomain = user.Email.Split('@');
+            if (emailDomain.Length != 2) {
+                return new UserResponse<bool>
+                {
+                    IsSuccess = false,
+                    StatusCode = 500,
+                    Message = "Unexpected error",
+                    InternalCode = ApiCode.Error                    
+                };
+            }
+            var response = await _httpClient.GetAsync($"https://subscription.keydevteam.com/api/subscription/check?domain={emailDomain[1]}");
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning($"{errorContent}");
+            if (response.IsSuccessStatusCode)
+            {
+                return new UserResponse<bool>
+                {
+                    IsSuccess = response.IsSuccessStatusCode,
+                    StatusCode = 200,
+                    Message = "",
+                    InternalCode = ApiCode.Success,
+                    Response = response.IsSuccessStatusCode
+                };
+            }
+            else
+            {
+                return new UserResponse<bool>
+                {
+                    IsSuccess = response.IsSuccessStatusCode,
+                    StatusCode = 200,
+                    Message = "Subscription expired",
+                    InternalCode = ApiCode.SubscriptionExpired,
+                    Response = response.IsSuccessStatusCode
+                };
+            }
+            
+
+        }
+
         #endregion
     }
 }

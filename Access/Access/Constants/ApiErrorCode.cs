@@ -31,8 +31,8 @@
         FailedResetPassword = 1025,
         FailedRefreshToken = 1026,
         TokenMissing = 1027,
-        TokenInvalid = 1028
+        TokenInvalid = 1028,
 
-
+        SubscriptionExpired = 1029,
     }
 }

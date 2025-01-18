@@ -15,6 +15,7 @@ using System.Text;
 using System.ComponentModel;
 using Polly;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http;
 
 namespace Access.Controllers
 {
@@ -28,12 +29,15 @@ namespace Access.Controllers
         private readonly ILogger<AuthenticationController> _logger;
         private readonly IConfiguration _configuration;
         private readonly DataContext _context;
+        private readonly HttpClient _httpClient;
         public AuthenticationController(UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IUserManagement user,
             IConfiguration configuration,
             ILogger<AuthenticationController> logger,
-            DataContext context)
+            DataContext context,
+            HttpClient httpClient
+            )
         {
             _userManager = userManager;
             _emailService = emailService;
@@ -41,6 +45,7 @@ namespace Access.Controllers
             _logger = logger;
             _configuration = configuration;
             _context = context;
+            _httpClient = httpClient;            
         }
 
         [HttpGet("migrate")]
@@ -202,7 +207,27 @@ namespace Access.Controllers
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" , Status = ApiCode.InvalidInputData});
             }
 
+            var subscription = await _user.CheckSubscription(loginModel.Username);
+            if (!subscription.IsSuccess)
+            {
+                if(subscription.InternalCode == ApiCode.UserNotFound)
+                {
+                    _logger.LogWarning($"User not found {loginModel.Username}.");
+                    return Unauthorized(new Response { IsSuccess = false, Message = "User not found", Status = ApiCode.UserNotFound });
+                }
+                if(subscription.InternalCode == ApiCode.Error) { 
+                    return StatusCode(subscription.StatusCode, new Response { IsSuccess = false, Message = subscription.Message, Status = subscription.InternalCode }); 
+                }
+                if(subscription.InternalCode == ApiCode.SubscriptionExpired)
+                {
+                    _logger.LogWarning($"Subscription expired for {loginModel.Username}.");
+                    return Unauthorized(new Response { IsSuccess = false, Message = "Subscription expired", Status = ApiCode.SubscriptionExpired });
+                }
+            }           
+            
+
             var loginOtpResponse = await _user.GetOtpByLoginAsync(loginModel);
+            
             if (!loginOtpResponse.IsSuccess)
             {
                 if(loginOtpResponse.InternalCode == ApiCode.EmailNotConfirmed)
@@ -389,5 +414,6 @@ namespace Access.Controllers
         }
 
 
+        
     }
 }

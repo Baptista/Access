@@ -65,7 +65,7 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-
+builder.Services.AddHttpClient();
 
 // Configure Serilog for file logging
 Log.Logger = new LoggerConfiguration()

@@ -12,5 +12,6 @@ namespace Access.Services.User
         Task<UserResponse<LoginResponse>> GetJwtTokenAsync(ApplicationUser user);
         Task<UserResponse<LoginResponse>> LoginUserWithJWTokenAsync(string otp, string userName);
         //Task<UserResponse<LoginResponse>> RenewAccessTokenAsync(LoginResponse tokens);
+        Task<UserResponse<bool>> CheckSubscription(string username);
     }
 }
