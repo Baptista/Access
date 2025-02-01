@@ -15,8 +15,8 @@ namespace Access.Data
         }
         protected override void OnModelCreating(ModelBuilder builder)
         {
-            base.OnModelCreating(builder);
             builder.Entity<SecurityLog>().HasKey(s => s.Id);
+            base.OnModelCreating(builder);            
             SeedRoles(builder);
         }
 

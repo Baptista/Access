@@ -2,6 +2,7 @@ using Access.Data;
 using Access.Models;
 using Access.Models.Authentication;
 using Access.Services.Email;
+using Access.Services.SecureLog;
 using Access.Services.User;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -28,7 +29,7 @@ var emailConfig = builder.Configuration
     .Get<EmailConfiguration>();
 builder.Services.AddSingleton(emailConfig);
 builder.Services.AddScoped<IEmailService, EmailService>();
-
+builder.Services.AddScoped<ISecurityLogService, SecurityLogService>();
 // Registrar o UserManagement
 builder.Services.AddScoped<IUserManagement, UserManagement>();
 
