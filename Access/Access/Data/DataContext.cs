@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Access.Models;
+using System.Reflection.Emit;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,6 +8,7 @@ namespace Access.Data
 {
     public class DataContext: IdentityDbContext<ApplicationUser>
     {
+        public DbSet<SecurityLog> SecurityLogs { get; set; }
         public DataContext(DbContextOptions<DataContext> options):base(options)
         {
 
@@ -13,6 +16,7 @@ namespace Access.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            builder.Entity<SecurityLog>().HasKey(s => s.Id);
             SeedRoles(builder);
         }
 

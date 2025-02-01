@@ -16,6 +16,7 @@ using System.ComponentModel;
 using Polly;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http;
+using Access.Services.SecureLog;
 
 namespace Access.Controllers
 {
@@ -26,6 +27,7 @@ namespace Access.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
         private readonly IUserManagement _user;
+        private readonly ISecurityLogService _securityLogService;
         private readonly ILogger<AuthenticationController> _logger;
         private readonly IConfiguration _configuration;
         private readonly DataContext _context;
@@ -33,6 +35,7 @@ namespace Access.Controllers
         public AuthenticationController(UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IUserManagement user,
+            ISecurityLogService securityLogService,
             IConfiguration configuration,
             ILogger<AuthenticationController> logger,
             DataContext context,
@@ -42,6 +45,7 @@ namespace Access.Controllers
             _userManager = userManager;
             _emailService = emailService;
             _user = user;
+            _securityLogService = securityLogService;
             _logger = logger;
             _configuration = configuration;
             _context = context;
@@ -89,14 +93,17 @@ namespace Access.Controllers
         [Route("Register")]
         public async Task<IActionResult> Register([FromBody] RegisterUser registerUser)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid registration attempt.");
+                await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
             if(!registerUser.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning("Email it´s not from keydevteam.com");
+                _logger.LogWarning("Email it´s not from domain");
+                await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Domain Invalid");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
             
@@ -179,11 +186,13 @@ namespace Access.Controllers
         [HttpPost("ConfirmEmail")]
         public async Task<IActionResult> ConfirmEmail(ConfirmModel confirmModel)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var user = await _userManager.FindByEmailAsync(confirmModel.email);
             if (user == null)
             {
-                _logger.LogWarning($"Email confirmation failed. User {confirmModel.email} does not exist.");
-                return NotFound(new Response { Status = ApiCode.UserNotFound, IsSuccess = false, Message = "This user does not exist!" });
+                _logger.LogWarning($"Email confirmation failed. Email {confirmModel.email} does not exist.");
+                await _securityLogService.LogSecurityEvent(ipAddress, confirmModel.email, "ConfirmEmail", "Email does not exist");
+                return NotFound(new Response { Status = ApiCode.UserNotFound, IsSuccess = false, Message = "This email does not exist!" });
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, confirmModel.token);
@@ -194,6 +203,7 @@ namespace Access.Controllers
             }
 
             _logger.LogWarning($"Email confirmation failed for {confirmModel.email}. Invalid or expired token.");
+            await _securityLogService.LogSecurityEvent(ipAddress, confirmModel.email, "ConfirmEmail", "Invalid or expired token");
             return BadRequest(new Response { Status = ApiCode.ExpiredTokenEmail, IsSuccess = false, Message = "Invalid or expired token." });
         }
 
@@ -201,9 +211,11 @@ namespace Access.Controllers
         [Route("Login")]
         public async Task<IActionResult> Login([FromBody] LoginModel loginModel)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
             if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("Invalid login attempt.");
+            {                
+                await _securityLogService.LogSecurityEvent(ipAddress, loginModel.Username, "Login", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" , Status = ApiCode.InvalidInputData});
             }
 
@@ -211,8 +223,8 @@ namespace Access.Controllers
             if (!subscription.IsSuccess)
             {
                 if(subscription.InternalCode == ApiCode.UserNotFound)
-                {
-                    _logger.LogWarning($"User not found {loginModel.Username}.");
+                {                    
+                    await _securityLogService.LogSecurityEvent(ipAddress, loginModel.Username, "Login", "User Not Found");
                     return Unauthorized(new Response { IsSuccess = false, Message = "User not found", Status = ApiCode.UserNotFound });
                 }
                 if(subscription.InternalCode == ApiCode.Error) { 
@@ -281,6 +293,7 @@ namespace Access.Controllers
         [Route("Login-2FA")]
         public async Task<IActionResult> LoginWithOTP([FromBody] LoginWithOtpModel loginWithOtpModel)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var jwt = await _user.LoginUserWithJWTokenAsync(loginWithOtpModel.Code, loginWithOtpModel.UserName);
             if (jwt.IsSuccess)
             {
@@ -289,6 +302,7 @@ namespace Access.Controllers
             }
 
             _logger.LogWarning($"Invalid OTP attempt for {loginWithOtpModel.UserName}.");
+            await _securityLogService.LogSecurityEvent(ipAddress, loginWithOtpModel.UserName, "LoginWithOTP", "Invalid code");
             return Unauthorized(new Response { IsSuccess = false, Message = "Invalid code" , Status = ApiCode.InvalidOTP });
         }
 
@@ -296,20 +310,23 @@ namespace Access.Controllers
         [Route("ForgotPassword")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordModel forgotPasswordModel)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             if (string.IsNullOrEmpty(forgotPasswordModel.Email))
             {
                 _logger.LogWarning("Forgot password attempt with missing email.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired  });
             }
-            if (!forgotPasswordModel.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            if (!forgotPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))               
             {
-                _logger.LogWarning("Email it´s not from keydevteam.com");
+                _logger.LogWarning("Email it´s not from domain");
+                await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
             var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
             if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
             {
                 _logger.LogInformation($"Password reset request for unconfirmed or non-existent user {forgotPasswordModel.Email}.");
+                await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Unconfirmed or non-existent email");
                 return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.Success });
             }
 
@@ -332,20 +349,24 @@ namespace Access.Controllers
         [Route("ResetPassword")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel resetPasswordModel)
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid reset password attempt.");
+                await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData});
             }
-            if (!resetPasswordModel.Email.EndsWith("@keydevteam.com", StringComparison.OrdinalIgnoreCase))
+            if (!resetPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Email it´s not from keydevteam.com");
+                await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
             var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
             if (user == null)
             {
                 _logger.LogWarning($"Reset password attempt for non-existent email {resetPasswordModel.Email}.");
+                await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Email does not exist");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.EmailNotFound });
             }
 
@@ -381,9 +402,12 @@ namespace Access.Controllers
         [Route("ValidateToken")]
         public async Task<IActionResult> ValidateToken()
         {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
             var authHeader = Request.Headers["Authorization"].ToString();
             if (string.IsNullOrEmpty(authHeader))
             {
+                await _securityLogService.LogSecurityEvent(ipAddress, authHeader, "ValidateToken", "Token missing");
                 return Unauthorized(new Response { IsSuccess = false, Message = "Token missing", Status = ApiCode.TokenMissing });
             }
 
@@ -409,6 +433,7 @@ namespace Access.Controllers
             }
             catch (Exception ex)
             {
+                await _securityLogService.LogSecurityEvent(ipAddress, authHeader, "ValidateToken", "Token invalid");
                 return Unauthorized(new Response { IsSuccess = false, Message = ex.Message, Status = ApiCode.TokenInvalid });
             }
         }
