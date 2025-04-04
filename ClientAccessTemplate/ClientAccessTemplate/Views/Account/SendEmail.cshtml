@@ -8,14 +8,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@ViewData["Title"]</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="alert alert-info text-center" role="alert">
-            <h2>Verifique seu e-mail</h2>
-            <p>Enviamos um e-mail para o endereço fornecido. Por favor, verifique sua caixa de entrada (ou pasta de spam) e clique no link para confirmar seu e-mail.</p>
-            <p>Se não recebeu o e-mail, pode registar de novo</p>
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card shadow-lg p-5" style="max-width: 500px;">
+            <div class="text-center">
+                <h3 class="mb-4">Verifique seu e-mail</h3>
+                <p>Enviamos um e-mail para o endereço fornecido.</p>
+                <p>Por favor, verifique sua caixa de entrada (ou pasta de spam) e clique no link para confirmar seu e-mail.</p>
+                <p class="mt-4">Não recebeu o e-mail? <a href="@Url.Action("Register", "Account")" class="text-decoration-none">Registre-se novamente</a></p>
+            </div>
         </div>
     </div>
 </body>

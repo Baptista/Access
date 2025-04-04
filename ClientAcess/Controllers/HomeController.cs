@@ -16,7 +16,11 @@ namespace ClientAcess.Controllers
         {
             _logger = logger;
             _httpClient = httpClient;
+#if DEBUG
+            _httpClient.BaseAddress = new Uri("http://localhost:5222/api/authentication/");
+#else
             _httpClient.BaseAddress = new Uri("https://accessapi.keydevteam.com/api/authentication/");
+#endif
         }
 
         public async Task<IActionResult> Index()

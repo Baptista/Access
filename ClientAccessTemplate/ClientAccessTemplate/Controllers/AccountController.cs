@@ -31,18 +31,18 @@ namespace ClientAccessTemplate.Controllers
 
             if (response.IsSuccessStatusCode)
             {
-                return RedirectToAction("SendEmail");                
+                return RedirectToAction("SendEmail");
             }
             var errorContent = await response.Content.ReadAsStringAsync();
             var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
-                ViewBag.Message = apiError.Message;                
+                ViewBag.Message = apiError.Message;
             }
             else
             {
-                ViewBag.Message = "Error registering user";                
+                ViewBag.Message = "Error registering user";
             }
             return View(model);
         }
@@ -58,7 +58,7 @@ namespace ClientAccessTemplate.Controllers
             ConfirmModel confirmModel = new ConfirmModel();
             confirmModel.email = email;
             confirmModel.token = token;
-            var response = await _httpClient.PostAsJsonAsync("ConfirmEmail",confirmModel);
+            var response = await _httpClient.PostAsJsonAsync("ConfirmEmail", confirmModel);
             if (response.IsSuccessStatusCode)
             {
                 return RedirectToAction("Login");
@@ -77,14 +77,15 @@ namespace ClientAccessTemplate.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Login() {
+        public async Task<IActionResult> Login()
+        {
             Request.Cookies.TryGetValue("jwtToken", out var token);
-            if (!string.IsNullOrEmpty(token))            
+            if (!string.IsNullOrEmpty(token))
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var response = await _httpClient.GetAsync("ValidateToken");
                 if (response.IsSuccessStatusCode)
-                {                    
+                {
                     return RedirectToAction("Index", "Home");
                 }
                 else
@@ -95,7 +96,7 @@ namespace ClientAccessTemplate.Controllers
                     });
                 }
             }
-            return View(); 
+            return View();
         }
 
         [HttpPost]
@@ -106,20 +107,20 @@ namespace ClientAccessTemplate.Controllers
             var response = await _httpClient.PostAsJsonAsync("login", model);
 
             if (response.IsSuccessStatusCode)
-            {   
-                return RedirectToAction("LoginWithOTP", new { userName = model .Username});
+            {
+                return RedirectToAction("LoginWithOTP", new { userName = model.Username });
             }
             var errorContent = await response.Content.ReadAsStringAsync();
-            var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
+            var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
 
             if (apiError != null && !string.IsNullOrEmpty(apiError.Message))
             {
-                ViewBag.Message = apiError.Message;                
+                ViewBag.Message = apiError.Message;
             }
             else
             {
-                ViewBag.Message = "Invalid login attempt";                
-            }            
+                ViewBag.Message = "Invalid login attempt";
+            }
             return View(model);
         }
 
@@ -144,7 +145,7 @@ namespace ClientAccessTemplate.Controllers
             {
                 return RedirectToAction("Login");
             }
-            ViewBag.Message = "Failed to reset password";            
+            ViewBag.Message = "Failed to reset password";
             return View(model);
         }
 
@@ -169,7 +170,7 @@ namespace ClientAccessTemplate.Controllers
                 ViewBag.Message = "If the email exists, a reset link has been sent.";
                 return View();
             }
-            ViewBag.Message = "Error sending reset link.";            
+            ViewBag.Message = "Error sending reset link.";
             return View(model);
         }
 
@@ -193,19 +194,19 @@ namespace ClientAccessTemplate.Controllers
             if (response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                var apiError = JsonConvert.DeserializeObject<Response>(errorContent); 
+                var apiError = JsonConvert.DeserializeObject<Response>(errorContent);
                 Response.Cookies.Append("jwtToken", apiError.Result.AccessToken.Token, new CookieOptions
                 {
-                    HttpOnly = true, 
-                    Secure = true  
-                    
+                    HttpOnly = true,
+                    Secure = true
+
                 });
-                                
+
                 return RedirectToAction("Index", "Home");
             }
 
             ViewBag.Message = "Invalid OTP. Please try again.";
             return View(model);
-        }        
+        }
     }
 }

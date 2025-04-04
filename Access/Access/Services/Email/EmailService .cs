@@ -5,6 +5,7 @@ using Access.Models;
 using Polly.Retry;
 using Polly;
 using System.Net.Mail;
+using System.Net;
 //using System.Net.Mail;
 
 namespace Access.Services.Email
@@ -62,13 +63,30 @@ namespace Access.Services.Email
 
         private async Task SendAsync(MailMessage mailMessage)
         {
-            using var client = new SmtpClient(_emailConfig.SmtpServer);
+#if DEBUG
+
             try
             {
-                //await client.ConnectAsync(_emailConfig.SmtpServer, _emailConfig.Port, true);
-                //client.AuthenticationMechanisms.Remove("XOAUTH2");
-                //await client.AuthenticateAsync(_emailConfig.UserName, _emailConfig.Password);
-
+                using (var client = new SmtpClient())
+                {
+                    client.Host = "smtp.gmail.com";
+                    client.Port = 587;
+                    client.DeliveryMethod = SmtpDeliveryMethod.Network;
+                    client.UseDefaultCredentials = false;
+                    client.EnableSsl = true;
+                    client.Credentials = new NetworkCredential(_emailConfig.From, _emailConfig.Password);
+                    client.Send(mailMessage);
+                    
+                }               
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error send email: " + ex.Message);
+            }
+#else
+            using var client = new SmtpClient(_emailConfig.SmtpServer);
+            try
+            {                
                 client.Send(mailMessage);
                 _logger.LogInformation("Email sent successfully.");
             }            
@@ -81,6 +99,8 @@ namespace Access.Services.Email
             {                
                 client.Dispose();
             }
+
+#endif
         }
     }
 

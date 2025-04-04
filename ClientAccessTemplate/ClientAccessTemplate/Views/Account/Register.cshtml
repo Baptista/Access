@@ -4,60 +4,61 @@
 
 @model Access.Models.Authentication.RegisterModel
 
-<div class="container">
-    <h2>Register</h2>
+<div class="container d-flex justify-content-center align-items-center vh-100">
+    <div class="card shadow-lg p-4" style="width: 450px;">
+        <h3 class="text-center mb-4">Register</h3>
 
-    <form asp-action="Register">
-        <div class="form-group">
-            <label asp-for="Username"></label>
-            <input asp-for="Username" class="form-control" />
-            <span asp-validation-for="Username" class="text-danger"></span>
-        </div>
+        <form asp-action="Register">
+            <div class="mb-3">
+                <label asp-for="Username" class="form-label">Username</label>
+                <input asp-for="Username" class="form-control" placeholder="Choose a username" />
+                <span asp-validation-for="Username" class="text-danger"></span>
+            </div>
 
-        <div class="form-group">
-            <label asp-for="Email"></label>
-            <input asp-for="Email" class="form-control" />
-            <span asp-validation-for="Email" class="text-danger"></span>
-        </div>
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Email</label>
+                <input asp-for="Email" type="email" class="form-control" placeholder="Your email address" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
 
-        <div class="form-group">
-            <label asp-for="Password"></label>
-            <div class="input-group">
-                <input asp-for="Password" type="password" class="form-control" id="password" />
-                <div class="input-group-append">
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label">Password</label>
+                <div class="input-group">
+                    <input asp-for="Password" type="password" class="form-control" id="password" placeholder="Create a password" />
                     <button type="button" class="btn btn-outline-secondary" id="togglePassword">Show</button>
                 </div>
+                <span asp-validation-for="Password" class="text-danger"></span>
+                <div id="passwordStrength" class="text-info mt-1"></div>
             </div>
-            <span asp-validation-for="Password" class="text-danger"></span>
-            <div id="passwordStrength" class="text-info mt-1"></div> <!-- Password strength indicator -->
-        </div>
 
-        <div class="form-group">
-            <label asp-for="ConfirmPassword"></label>
-            <div class="input-group">
-                <input asp-for="ConfirmPassword" type="password" class="form-control" id="confirmPassword" />
-                <div class="input-group-append">
+            <div class="mb-3">
+                <label asp-for="ConfirmPassword" class="form-label">Confirm Password</label>
+                <div class="input-group">
+                    <input asp-for="ConfirmPassword" type="password" class="form-control" id="confirmPassword" placeholder="Confirm your password" />
                     <button type="button" class="btn btn-outline-secondary" id="toggleConfirmPassword">Show</button>
                 </div>
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
-            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
-        </div>
 
-        <button type="submit" class="btn btn-primary">Register</button>
-    </form>
+            <button type="submit" class="btn btn-primary w-100 mt-3">Register</button>
 
-    @if (ViewBag.Message != null)
-    {
-        <div class="alert alert-danger mt-3">
-            @ViewBag.Message
-        </div>
-    }
+            @if (ViewBag.Message != null)
+            {
+                <div class="alert alert-danger mt-3">
+                    @ViewBag.Message
+                </div>
+            }
+
+            <div class="text-center mt-3">
+                Already have an account? <a href="@Url.Action("Login", "Account")" class="text-decoration-none">Login</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        // Toggle password visibility for the 'Password' field
         document.getElementById('togglePassword').addEventListener('click', function () {
             const passwordField = document.getElementById('password');
             const type = passwordField.type === 'password' ? 'text' : 'password';
@@ -65,12 +66,42 @@
             this.textContent = type === 'password' ? 'Show' : 'Hide';
         });
 
-        // Toggle password visibility for the 'ConfirmPassword' field
         document.getElementById('toggleConfirmPassword').addEventListener('click', function () {
             const confirmPasswordField = document.getElementById('confirmPassword');
             const type = confirmPasswordField.type === 'password' ? 'text' : 'password';
             confirmPasswordField.type = type;
             this.textContent = type === 'password' ? 'Show' : 'Hide';
         });
+
+                document.getElementById('password').addEventListener('input', function () {
+            const strengthText = document.getElementById('passwordStrength');
+            const password = this.value;
+            const strength = checkPasswordStrength(password);
+
+            strengthText.textContent = `Strength: ${strength.text}`;
+            strengthText.className = `mt-1 ${strength.class}`;
+        });
+
+        function checkPasswordStrength(password) {
+            let strengthScore = 0;
+
+            if (password.length >= 8) strengthScore++;
+            if (/[A-Z]/.test(password)) strengthScore++;
+            if (/[a-z]/.test(password)) strengthScore++;
+            if (/[0-9]/.test(password)) strengthScore++;
+            if (/[^A-Za-z0-9]/.test(password)) strengthScore++;
+
+            switch (strengthScore) {
+                case 0:
+                case 1:
+                case 2:
+                    return { text: 'Weak', class: 'text-danger' };
+                case 3:
+                case 4:
+                    return { text: 'Medium', class: 'text-warning' };
+                case 5:
+                    return { text: 'Strong', class: 'text-success' };
+            }
+        }
     </script>
 }

@@ -17,6 +17,7 @@ using Polly;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http;
 using Access.Services.SecureLog;
+using System.Diagnostics;
 
 namespace Access.Controllers
 {
@@ -50,6 +51,96 @@ namespace Access.Controllers
             _configuration = configuration;
             _context = context;
             _httpClient = httpClient;            
+        }
+
+
+        [HttpGet("DatabaseUpdate")]
+        public IActionResult DatabaseUpdate()
+        {
+            try
+            {
+                _logger.LogInformation(Directory.GetCurrentDirectory());
+                // Set this to the folder that contains your project file
+                string projectDirectory = Path.Combine(Directory.GetCurrentDirectory(), "");
+                                
+                // 2. Update the database
+                int updateExitCode = ExecuteCommand(
+                    "dotnet",
+                    "ef database update",
+                    projectDirectory);
+
+                if (updateExitCode != 0)
+                {
+                    _logger.LogError("Failed to update the database (exit code: {ExitCode}).", updateExitCode);
+                    return BadRequest("Error updating the database.");
+                }
+
+                return Ok("Migrations applied successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while applying migrations.");
+                return BadRequest("Error applying migrations.");
+            }
+        }
+
+
+        [HttpGet("AddSecurityLogTable")]
+        public IActionResult AddSecurityLogTable()
+        {
+            try
+            {
+                _logger.LogInformation(Directory.GetCurrentDirectory());
+                // Set this to the folder that contains your project file
+                string projectDirectory = Path.Combine(Directory.GetCurrentDirectory(), "");
+
+                // 1. Add the migration
+                int addMigrationExitCode = ExecuteCommand(
+                    "dotnet",
+                    "ef migrations add AddSecurityLogTable",
+                    projectDirectory);
+
+                if (addMigrationExitCode != 0)
+                {
+                    _logger.LogError("Failed to add migration (exit code: {ExitCode}).", addMigrationExitCode);
+                    return BadRequest("Error adding migration.");
+                }
+
+                return Ok("Migrations applied successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while applying migrations.");
+                return BadRequest("Error applying migrations.");
+            }
+        }
+
+        private int ExecuteCommand(string command, string arguments, string workingDirectory)
+        {
+            using (Process process = new Process())
+            {
+                process.StartInfo.FileName = command;
+                process.StartInfo.Arguments = arguments;
+                process.StartInfo.WorkingDirectory = workingDirectory;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
+
+                process.Start();
+
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+
+                process.WaitForExit();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                    _logger.LogInformation("Output: {Output}", output);
+                if (!string.IsNullOrWhiteSpace(error))
+                    _logger.LogError("Error: {Error}", error);
+
+                return process.ExitCode;
+            }
         }
 
         [HttpGet("migrate")]
@@ -92,21 +183,23 @@ namespace Access.Controllers
         [HttpPost]
         [Route("Register")]
         public async Task<IActionResult> Register([FromBody] RegisterUser registerUser)
-        {
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+        {            
             if (!ModelState.IsValid)
             {
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
                 _logger.LogWarning("Invalid registration attempt.");
                 await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
+#if !DEMO
             if(!registerUser.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
                 _logger.LogWarning("Email it´s not from domain");
                 await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Domain Invalid");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
-            
+#endif           
             // Check if the user already exists by email
             var existingUser = await _userManager.FindByEmailAsync(registerUser.Email);
             if (existingUser != null)
@@ -316,12 +409,14 @@ namespace Access.Controllers
                 _logger.LogWarning("Forgot password attempt with missing email.");
                 return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired  });
             }
+#if !DEMO
             if (!forgotPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))               
             {
                 _logger.LogWarning("Email it´s not from domain");
                 await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
+#endif
             var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
             if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
             {
@@ -356,12 +451,14 @@ namespace Access.Controllers
                 await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData});
             }
+#if !DEMO
             if (!resetPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Email it´s not from keydevteam.com");
                 await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
+#endif
             var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
             if (user == null)
             {

@@ -15,19 +15,19 @@ namespace Access.Data
         }
         protected override void OnModelCreating(ModelBuilder builder)
         {
-            builder.Entity<SecurityLog>().HasKey(s => s.Id);
+            //builder.Entity<SecurityLog>().HasKey(s => s.Id);
             base.OnModelCreating(builder);            
-            SeedRoles(builder);
+            //SeedRoles(builder);
         }
 
-        private static void SeedRoles(ModelBuilder builder)
-        {
-            builder.Entity<IdentityRole>().HasData
-                (
-                new IdentityRole() { Name = "Admin", ConcurrencyStamp = "1", NormalizedName = "Admin" },
-                new IdentityRole() { Name = "User", ConcurrencyStamp = "2", NormalizedName = "User" }
+        //private static void SeedRoles(ModelBuilder builder)
+        //{
+        //    builder.Entity<IdentityRole>().HasData
+        //        (
+        //        new IdentityRole() { Name = "Admin", ConcurrencyStamp = "1", NormalizedName = "Admin" },
+        //        new IdentityRole() { Name = "User", ConcurrencyStamp = "2", NormalizedName = "User" }
 
-                );
-        }
+        //        );
+        //}
     }
 }

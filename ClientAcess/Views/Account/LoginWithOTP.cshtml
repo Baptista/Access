@@ -1,29 +1,36 @@
 ﻿@model Access.Models.Authentication.LoginWithOtpModel
 
-<div class="container">
-    <h2>Login with OTP</h2>
-    <form asp-action="LoginWithOTP">
-        <div class="form-group">
-            <label asp-for="UserName"></label>
-            <input asp-for="UserName" class="form-control" readonly />
-            <span asp-validation-for="UserName" class="text-danger"></span>
-        </div>
+<div class="container d-flex justify-content-center align-items-center vh-100">
+    <div class="card shadow-lg p-4" style="width: 400px;">
+        <h3 class="text-center mb-4">Login with OTP</h3>
 
-        <div class="form-group">
-            <label asp-for="Code">OTP Code</label>
-            <input asp-for="Code" class="form-control" />
-            <span asp-validation-for="Code" class="text-danger"></span>
-        </div>
+        <form asp-action="LoginWithOTP">
+            <div class="mb-3">
+                <label asp-for="UserName" class="form-label">Username</label>
+                <input asp-for="UserName" class="form-control" readonly />
+                <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
 
-        <button type="submit" class="btn btn-primary">Submit</button>
-    </form>
+            <div class="mb-3">
+                <label asp-for="Code" class="form-label">OTP Code</label>
+                <input asp-for="Code" class="form-control" placeholder="Enter OTP code" />
+                <span asp-validation-for="Code" class="text-danger"></span>
+            </div>
 
-    @if (ViewBag.Message != null)
-    {
-        <div class="alert alert-danger mt-3">
-            @ViewBag.Message
-        </div>
-    }
+            <button type="submit" class="btn btn-primary w-100 mt-3">Submit</button>
+
+            @if (ViewBag.Message != null)
+            {
+                <div class="alert alert-danger mt-3">
+                    @ViewBag.Message
+                </div>
+            }
+
+            <div class="text-center mt-3">
+                <a href="@Url.Action("Login", "Account")" class="text-decoration-none">Back to Login</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 @section Scripts {

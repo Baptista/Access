@@ -15,6 +15,7 @@ namespace ClientAcess.Controllers
             IConfiguration configuration)
         {
             _httpClient = httpClient;
+
 #if DEBUG
             _httpClient.BaseAddress = new Uri("http://localhost:5222/api/Authentication/");
 #else

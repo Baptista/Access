@@ -8,21 +8,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@ViewData["Title"]</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="alert alert-danger text-center" role="alert">
-            <h2>Falha na Confirmação do Email</h2>
-            <p>Infelizmente, não conseguimos confirmar o seu endereço de e-mail. Isso pode ter ocorrido por diversos motivos, como um link de confirmação expirado ou inválido.</p>
-            <p>Por favor, tente as seguintes opções:</p>
-            <ul>
-                <li>Verifique o link de confirmação que você recebeu no seu e-mail. Ele pode ter expirado.</li>
-                <li>Se você não encontrou o e-mail, confira a sua caixa de spam ou lixo eletrônico.</li>      
-                <li>Pode voltar a registar para receber outro e-mail</li>
-            </ul>
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card shadow-lg p-5" style="max-width: 600px;">
+            <div class="text-center">
+                <h3 class="text-danger mb-4">Falha na Confirmação do Email</h3>
+                <p>Infelizmente, não conseguimos confirmar o seu endereço de e-mail. Isso pode ter ocorrido por diversos motivos, como um link de confirmação expirado ou inválido.</p>
+                <p class="mt-3">Por favor, tente as seguintes opções:</p>
+                <ul class="text-start">
+                    <li>Verifique o link de confirmação que você recebeu no seu e-mail. Ele pode ter expirado.</li>
+                    <li>Se você não encontrou o e-mail, confira a sua caixa de spam ou lixo eletrônico.</li>
+                    <li>Você pode <a href="@Url.Action("Register", "Account")" class="text-decoration-none">voltar a registrar-se</a> para receber outro e-mail.</li>
+                </ul>
+                <div class="mt-4">
+                    <a href="@Url.Action("Login", "Account")" class="btn btn-primary">Voltar ao Login</a>
+                </div>
+            </div>
         </div>
     </div>
 </body>
 </html>
-
