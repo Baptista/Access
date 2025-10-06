@@ -9,5 +9,7 @@ namespace Access.Models
         public string Message { get; set; }
         public bool IsSuccess { get; set; }
         public LoginResponse Result { get; set; }
+
+        public ReportResponse Report { get; set; }
     }
 }

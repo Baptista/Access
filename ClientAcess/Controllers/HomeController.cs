@@ -25,6 +25,7 @@ namespace ClientAcess.Controllers
 
         public async Task<IActionResult> Index()
         {
+            
             Request.Cookies.TryGetValue("jwtToken", out var token);
             if (!string.IsNullOrEmpty(token))
             {

@@ -56,10 +56,54 @@ namespace Access.Services.Email
             emailMessage.From = new MailAddress(_emailConfig.From);            
             emailMessage.To.Add(message.To);
             emailMessage.Subject = message.Subject;
-            emailMessage.Body = message.Content;
+            //emailMessage.Body = GetHtmlBody(message.Content);
 
+
+            AlternateView avHtml = AlternateView.CreateAlternateViewFromString(GetHtmlBody(message.Content), null, "text/html");
+
+            // Caminho físico da imagem no disco
+            var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "assets", "img", "logo.png");
+            var logoResource = new LinkedResource(logoPath, "image/png")
+            {
+                ContentId = "logoImage"
+            };
+            avHtml.LinkedResources.Add(logoResource);
+
+            emailMessage.AlternateViews.Add(avHtml);
+
+
+            emailMessage.IsBodyHtml = true;
             return emailMessage;
         }
+
+
+        private string GetHtmlBody(string content)
+        {
+            // Replace URLs with anchor tags
+            string pattern = @"(http[s]?://[^\s<>]+)";
+            string replacedContent = System.Text.RegularExpressions.Regex.Replace(content, pattern, "<a href='$1'>$1</a>");
+            //<b class='logo me-auto'><img src='cid:logoImage' width='100'></b>
+            return $@"
+    <html>
+        <body>
+            <p>{replacedContent}</p>
+
+            <br /> 
+            <br /> 
+            <br /> 
+            Best Regards,<br /> 
+            Blaykor <br /> 
+            
+            
+            
+                           
+            🌐 <a href='https://www.blaykor.com' style='color:green'>https://www.blaykor.com</a> <br />            
+            ✉️ support.bk@blaykor.com<br/>           
+
+        </body>
+    </html>";
+        }
+
 
         private async Task SendAsync(MailMessage mailMessage)
         {
@@ -85,6 +129,7 @@ namespace Access.Services.Email
             }
 #else
             using var client = new SmtpClient(_emailConfig.SmtpServer);
+            client.Credentials = new NetworkCredential("noreply@blaykor.com", "wrtcqx2009@Q");
             try
             {                
                 client.Send(mailMessage);

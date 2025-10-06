@@ -1,13 +1,20 @@
 using Access.Data;
+using Access.DataAccess;
 using Access.Models;
 using Access.Models.Authentication;
+using Access.Models.Lockout;
+using Access.Services.Authentication;
+using Access.Services.Background;
 using Access.Services.Email;
 using Access.Services.SecureLog;
 using Access.Services.User;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Text;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,11 +24,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Registrar o DbContext
-builder.Services.AddDbContext<DataContext>(options =>
-{
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
 
 // Registrar EmailService e sua configuração
 var emailConfig = builder.Configuration
@@ -29,30 +31,45 @@ var emailConfig = builder.Configuration
     .Get<EmailConfiguration>();
 builder.Services.AddSingleton(emailConfig);
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<ISecurityLogService, SecurityLogService>();
 // Registrar o UserManagement
-builder.Services.AddScoped<IUserManagement, UserManagement>();
+builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, PasswordHasher<ApplicationUser>>();
 
-// Configurar Identity corretamente
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-{
-    // Configurar opções de senha, bloqueio, etc. se necessário
-    //options.Password.RequireDigit = true;
-    //options.Password.RequiredLength = 6;
-    //options.Password.RequireNonAlphanumeric = true;
-    //options.Password.RequireUppercase = true;
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5); // Lockout duration
-    options.Lockout.MaxFailedAccessAttempts = 5; // Maximum failed attempts
-    options.Lockout.AllowedForNewUsers = true; // Enable lockout for new users
-})
-    .AddEntityFrameworkStores<DataContext>()
-    .AddDefaultTokenProviders(); // Registrar UserManager, SignInManager e RoleManager
+// Configure ADO.NET Repositories
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ISecurityLogRepository, SecurityLogRepository>();
+
+// Configure Services
+builder.Services.AddScoped<IUserManagement, UserManagementAdo>();
+builder.Services.AddScoped<ISecurityLogService, SecurityLogServiceAdo>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+
+
 
 // Registrar a autorização
 builder.Services.AddAuthorization();
 
 // Incluir Autenticação (opcionalmente JWT ou Cookies)
-builder.Services.AddAuthentication();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration["JWT:ValidAudience"],
+        ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
+        ClockSkew = TimeSpan.Zero,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"]))
+    };
+});
 
 // Configure Rate Limiting
 builder.Services.AddRateLimiter(options =>
@@ -86,6 +103,13 @@ builder.Services.AddCors(options =>
                .AllowAnyHeader();
     });
 });
+
+var lockoutSettings = builder.Configuration.GetSection("LockoutSettings").Get<LockoutSettings>()
+    ?? new LockoutSettings();
+builder.Services.AddSingleton(lockoutSettings);
+
+// Optional: Add the background cleanup service
+builder.Services.AddHostedService<LockoutCleanupService>();
 
 // Configurar o pipeline da aplicação
 var app = builder.Build();

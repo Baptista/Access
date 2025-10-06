@@ -1,219 +1,95 @@
-﻿using Access.Data;
-using Access.Models.Authentication;
+﻿using Access.Constants;
+using Access.Data;
+using Access.DataAccess;
 using Access.Models;
+using Access.Models.Authentication;
+using Access.Services.Authentication;
 using Access.Services.Email;
+using Access.Services.SecureLog;
 using Access.Services.User;
-using Azure;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Response = Access.Models.Response;
-using Access.Constants;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
-using System.ComponentModel;
-using Polly;
-using Microsoft.EntityFrameworkCore;
-using System.Net.Http;
-using Access.Services.SecureLog;
-using System.Diagnostics;
 
 namespace Access.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]    
+    [ApiController]
     public class AuthenticationController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IUserRepository _userRepository;
         private readonly IEmailService _emailService;
-        private readonly IUserManagement _user;
+        private readonly IUserManagement _userManagement;
         private readonly ISecurityLogService _securityLogService;
+        private readonly IAuthenticationService _authenticationService;
+        private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
         private readonly ILogger<AuthenticationController> _logger;
         private readonly IConfiguration _configuration;
-        private readonly DataContext _context;
         private readonly HttpClient _httpClient;
-        public AuthenticationController(UserManager<ApplicationUser> userManager,
+
+        public AuthenticationController(
+            IUserRepository userRepository,
             IEmailService emailService,
-            IUserManagement user,
+            IUserManagement userManagement,
             ISecurityLogService securityLogService,
+            IAuthenticationService authenticationService,
+            IPasswordHasher<ApplicationUser> passwordHasher,
             IConfiguration configuration,
             ILogger<AuthenticationController> logger,
-            DataContext context,
-            HttpClient httpClient
-            )
+            HttpClient httpClient)
         {
-            _userManager = userManager;
+            _userRepository = userRepository;
             _emailService = emailService;
-            _user = user;
+            _userManagement = userManagement;
             _securityLogService = securityLogService;
+            _authenticationService = authenticationService;
+            _passwordHasher = passwordHasher;
             _logger = logger;
             _configuration = configuration;
-            _context = context;
-            _httpClient = httpClient;            
-        }
-
-
-        [HttpGet("DatabaseUpdate")]
-        public IActionResult DatabaseUpdate()
-        {
-            try
-            {
-                _logger.LogInformation(Directory.GetCurrentDirectory());
-                // Set this to the folder that contains your project file
-                string projectDirectory = Path.Combine(Directory.GetCurrentDirectory(), "");
-                                
-                // 2. Update the database
-                int updateExitCode = ExecuteCommand(
-                    "dotnet",
-                    "ef database update",
-                    projectDirectory);
-
-                if (updateExitCode != 0)
-                {
-                    _logger.LogError("Failed to update the database (exit code: {ExitCode}).", updateExitCode);
-                    return BadRequest("Error updating the database.");
-                }
-
-                return Ok("Migrations applied successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while applying migrations.");
-                return BadRequest("Error applying migrations.");
-            }
-        }
-
-
-        [HttpGet("AddSecurityLogTable")]
-        public IActionResult AddSecurityLogTable()
-        {
-            try
-            {
-                _logger.LogInformation(Directory.GetCurrentDirectory());
-                // Set this to the folder that contains your project file
-                string projectDirectory = Path.Combine(Directory.GetCurrentDirectory(), "");
-
-                // 1. Add the migration
-                int addMigrationExitCode = ExecuteCommand(
-                    "dotnet",
-                    "ef migrations add AddSecurityLogTable",
-                    projectDirectory);
-
-                if (addMigrationExitCode != 0)
-                {
-                    _logger.LogError("Failed to add migration (exit code: {ExitCode}).", addMigrationExitCode);
-                    return BadRequest("Error adding migration.");
-                }
-
-                return Ok("Migrations applied successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while applying migrations.");
-                return BadRequest("Error applying migrations.");
-            }
-        }
-
-        private int ExecuteCommand(string command, string arguments, string workingDirectory)
-        {
-            using (Process process = new Process())
-            {
-                process.StartInfo.FileName = command;
-                process.StartInfo.Arguments = arguments;
-                process.StartInfo.WorkingDirectory = workingDirectory;
-                process.StartInfo.RedirectStandardOutput = true;
-                process.StartInfo.RedirectStandardError = true;
-                process.StartInfo.UseShellExecute = false;
-                process.StartInfo.CreateNoWindow = true;
-
-                process.Start();
-
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-
-                process.WaitForExit();
-
-                if (!string.IsNullOrWhiteSpace(output))
-                    _logger.LogInformation("Output: {Output}", output);
-                if (!string.IsNullOrWhiteSpace(error))
-                    _logger.LogError("Error: {Error}", error);
-
-                return process.ExitCode;
-            }
-        }
-
-        [HttpGet("migrate")]
-        public IActionResult ApplyMigrations()
-        {
-            try
-            {
-                _context.Database.Migrate();
-                return Ok("Migrations applied successfully.");
-            }
-            catch (Exception ex) {
-                _logger.LogError(ex.Message);
-                return Ok("Error migrate");
-            }
+            _httpClient = httpClient;
         }
 
         [HttpGet]
         [Route("Version")]
         public string Version()
         {
-            return "1.0.0.0";
+            return "0.0.0.1"; // Updated version for ADO.NET
         }
-        //[HttpGet]
-        //[Route("Teste")]
-        //public string Teste()
-        //{
-        //    try
-        //    {
-        //        var a = _userManager.FindByEmailAsync("bruno_baptista86@hotmail.com");
-        //        return a.Result.UserName;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex.Message);
-        //        return "";
-        //    }
-        //}
-
 
         [HttpPost]
         [Route("Register")]
         public async Task<IActionResult> Register([FromBody] RegisterUser registerUser)
-        {            
+        {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             if (!ModelState.IsValid)
-            {
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+            {                
                 _logger.LogWarning("Invalid registration attempt.");
                 await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Invalid Input Data");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
+
 #if !DEMO
-            if(!registerUser.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
+            if (!registerUser.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
                 _logger.LogWarning("Email it´s not from domain");
                 await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Domain Invalid");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
-#endif           
-            // Check if the user already exists by email
-            var existingUser = await _userManager.FindByEmailAsync(registerUser.Email);
+#endif
+            // Check if user exists
+            var existingUser = await _userRepository.GetUserByEmailAsync(registerUser.Email);
             if (existingUser != null)
             {
-                // Check if the email has already been confirmed
-                if (!await _userManager.IsEmailConfirmedAsync(existingUser))
+                if (!existingUser.EmailConfirmed)
                 {
-                    // Resend confirmation email since the user exists but hasn't confirmed their email
-                    var token = await _userManager.GenerateEmailConfirmationTokenAsync(existingUser);
-                                        
+                    // Resend confirmation email
+                    var token = await GenerateEmailConfirmationToken(existingUser);
                     var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
                     var message = new Message(
-                        registerUser.Email! ,
+                        registerUser.Email!,
                         "Resend Confirm Email",
                         $"Please confirm your email by clicking on the following link: {clientResetLink}"
                     );
@@ -222,6 +98,8 @@ namespace Access.Controllers
 
                     if (result.Success)
                     {
+
+                        await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "Email registered but not confirmed");
                         return Ok(new Response
                         {
                             IsSuccess = true,
@@ -233,38 +111,37 @@ namespace Access.Controllers
                     _logger.LogError($"Failed to resend confirmation email to {registerUser.Email}");
                     return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "Failed to send confirmation email. Please try again later.", Status = ApiCode.FailSendEmail });
                 }
+                await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", "User already exists and email is confirmed");
 
-                // If the email is confirmed, return a message indicating that the user already exists
-                return BadRequest(new Response { IsSuccess = false, Message = "User already exists and email is confirmed." , Status = ApiCode.UserAlreadyExist });
+                return BadRequest(new Response { IsSuccess = false, Message = "User already exists and email is confirmed.", Status = ApiCode.UserAlreadyExist });
             }
 
-            // Proceed with new user registration since the email is not in use
-            ApplicationUser user = new ApplicationUser
+            // Create new user
+            var createUserResult = await _userManagement.CreateUserWithTokenAsync(registerUser);
+            if (!createUserResult.IsSuccess)
             {
-                Email = registerUser.Email,
-                SecurityStamp = Guid.NewGuid().ToString(),
-                UserName = registerUser.Username,
-                TwoFactorEnabled = true
-            };
+                await _securityLogService.LogSecurityEvent(ipAddress, registerUser.Email, "Register", createUserResult.Message!);
 
-            var resultCreate = await _userManager.CreateAsync(user, registerUser.Password);
-            if (!resultCreate.Succeeded)
-            {
-                _logger.LogError($"Failed to create user: {string.Join(", ", resultCreate.Errors.Select(e => e.Description))}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { IsSuccess = false, Message = "User creation failed.", Status = ApiCode.UserCreationFailed });
+                return StatusCode(createUserResult.StatusCode, new Response
+                {
+                    IsSuccess = false,
+                    Message = createUserResult.Message!,
+                    Status = createUserResult.InternalCode
+                });
             }
 
-            // Generate confirmation token for new user
-            var tokenNewUser = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            // Send confirmation email
+            var newUser = createUserResult.Response?.User;
+            var confirmToken = createUserResult.Response?.Token;
 
-            var clientResetLinkNewUser = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(tokenNewUser)}&email={Uri.EscapeDataString(registerUser.Email)}";
+            var clientResetLinkNewUser = $"{_configuration["ClientApp:BaseUrl"]}/ConfirmEmail?token={Uri.EscapeDataString(confirmToken)}&email={Uri.EscapeDataString(registerUser.Email)}";
 
             var messageNewUser = new Message(
                 registerUser.Email!,
                 "Confirm Email",
                 $"Please confirm your email by clicking on the following link: {clientResetLinkNewUser}"
             );
-                        
+
             var sendResult = await _emailService.SendEmailAsync(messageNewUser);
 
             if (sendResult.Success)
@@ -280,16 +157,9 @@ namespace Access.Controllers
         public async Task<IActionResult> ConfirmEmail(ConfirmModel confirmModel)
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-            var user = await _userManager.FindByEmailAsync(confirmModel.email);
-            if (user == null)
-            {
-                _logger.LogWarning($"Email confirmation failed. Email {confirmModel.email} does not exist.");
-                await _securityLogService.LogSecurityEvent(ipAddress, confirmModel.email, "ConfirmEmail", "Email does not exist");
-                return NotFound(new Response { Status = ApiCode.UserNotFound, IsSuccess = false, Message = "This email does not exist!" });
-            }
 
-            var result = await _userManager.ConfirmEmailAsync(user, confirmModel.token);
-            if (result.Succeeded)
+            var result = await _authenticationService.ConfirmEmailAsync(confirmModel.email, confirmModel.token);
+            if (result)
             {
                 _logger.LogInformation($"Email confirmed for user {confirmModel.email}.");
                 return Ok(new Response { Status = ApiCode.Success, IsSuccess = true, Message = "Email verified successfully" });
@@ -307,58 +177,54 @@ namespace Access.Controllers
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
 
             if (!ModelState.IsValid)
-            {                
+            {
                 await _securityLogService.LogSecurityEvent(ipAddress, loginModel.Username, "Login", "Invalid Input Data");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data" , Status = ApiCode.InvalidInputData});
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
 
-            var subscription = await _user.CheckSubscription(loginModel.Username);
+            var subscription = await _userManagement.CheckSubscription(loginModel.Username);
             if (!subscription.IsSuccess)
             {
-                if(subscription.InternalCode == ApiCode.UserNotFound)
-                {                    
+                if (subscription.InternalCode == ApiCode.UserNotFound)
+                {
                     await _securityLogService.LogSecurityEvent(ipAddress, loginModel.Username, "Login", "User Not Found");
                     return Unauthorized(new Response { IsSuccess = false, Message = "User not found", Status = ApiCode.UserNotFound });
                 }
-                if(subscription.InternalCode == ApiCode.Error) { 
-                    return StatusCode(subscription.StatusCode, new Response { IsSuccess = false, Message = subscription.Message, Status = subscription.InternalCode }); 
+                if (subscription.InternalCode == ApiCode.Error)
+                {
+                    return StatusCode(subscription.StatusCode, new Response { IsSuccess = false, Message = subscription.Message, Status = subscription.InternalCode });
                 }
-                if(subscription.InternalCode == ApiCode.SubscriptionExpired)
+                if (subscription.InternalCode == ApiCode.SubscriptionExpired)
                 {
                     _logger.LogWarning($"Subscription expired for {loginModel.Username}.");
                     return Unauthorized(new Response { IsSuccess = false, Message = "Subscription expired", Status = ApiCode.SubscriptionExpired });
                 }
-            }           
-            
+            }
 
-            var loginOtpResponse = await _user.GetOtpByLoginAsync(loginModel);
-            
+            var loginOtpResponse = await _userManagement.GetOtpByLoginAsync(loginModel);
+
             if (!loginOtpResponse.IsSuccess)
             {
-                if(loginOtpResponse.InternalCode == ApiCode.EmailNotConfirmed)
+                if (loginOtpResponse.InternalCode == ApiCode.EmailNotConfirmed)
                 {
-                    var loginuser = await _userManager.FindByNameAsync(loginModel.Username);
-                    // Generate confirmation token for new user
-                    var tokenNewUser = await _userManager.GenerateEmailConfirmationTokenAsync(loginuser);
-
-                    // Create confirmation link
+                    var loginuser = await _userRepository.GetUserByUserNameAsync(loginModel.Username);
+                    var tokenNewUser = await GenerateEmailConfirmationToken(loginuser);
                     var confirmationLinkNewUser = Url.Action(nameof(ConfirmEmail), "Authentication",
                         new { token = tokenNewUser, email = loginuser.Email }, Request.Scheme);
-
-                    // Send confirmation email
-                    var messageNewUser = new Message(loginuser.Email , "Confirm your email", confirmationLinkNewUser);
+                    var messageNewUser = new Message(loginuser.Email!, "Confirm your email", confirmationLinkNewUser!);
                     var sendResult = await _emailService.SendEmailAsync(messageNewUser);
                 }
+                await _securityLogService.LogSecurityEvent(ipAddress, loginModel.Username, "Login", loginOtpResponse.Message!);
 
                 return StatusCode(loginOtpResponse.StatusCode, new Response
                 {
                     IsSuccess = false,
-                    Message = loginOtpResponse.Message,
+                    Message = loginOtpResponse.Message!,
                     Status = loginOtpResponse.InternalCode
                 });
             }
 
-            var user = loginOtpResponse.Response.User;
+            var user = loginOtpResponse.Response?.User!;
             if (user.TwoFactorEnabled)
             {
                 var token = loginOtpResponse.Response.Token;
@@ -379,7 +245,7 @@ namespace Access.Controllers
             {
                 _logger.LogWarning($"Two Factor disabled {loginModel.Username}.");
                 return Unauthorized(new Response { IsSuccess = false, Message = "Two Factor disabled", Status = ApiCode.InvalidCredentials });
-            }            
+            }
         }
 
         [HttpPost]
@@ -387,7 +253,7 @@ namespace Access.Controllers
         public async Task<IActionResult> LoginWithOTP([FromBody] LoginWithOtpModel loginWithOtpModel)
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-            var jwt = await _user.LoginUserWithJWTokenAsync(loginWithOtpModel.Code, loginWithOtpModel.UserName);
+            var jwt = await _userManagement.LoginUserWithJWTokenAsync(loginWithOtpModel.Code, loginWithOtpModel.UserName);
             if (jwt.IsSuccess)
             {
                 _logger.LogInformation($"User {loginWithOtpModel.UserName} successfully logged in with OTP.");
@@ -396,7 +262,7 @@ namespace Access.Controllers
 
             _logger.LogWarning($"Invalid OTP attempt for {loginWithOtpModel.UserName}.");
             await _securityLogService.LogSecurityEvent(ipAddress, loginWithOtpModel.UserName, "LoginWithOTP", "Invalid code");
-            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid code" , Status = ApiCode.InvalidOTP });
+            return Unauthorized(new Response { IsSuccess = false, Message = "Invalid code", Status = ApiCode.InvalidOTP });
         }
 
         [HttpPost]
@@ -407,30 +273,31 @@ namespace Access.Controllers
             if (string.IsNullOrEmpty(forgotPasswordModel.Email))
             {
                 _logger.LogWarning("Forgot password attempt with missing email.");
-                return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired  });
+                await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Email is required");
+                return BadRequest(new Response { IsSuccess = false, Message = "Email is required", Status = ApiCode.EmailRequired });
             }
+
 #if !DEMO
-            if (!forgotPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))               
+            if (!forgotPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Email it´s not from domain");
                 await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
 #endif
-            var user = await _userManager.FindByEmailAsync(forgotPasswordModel.Email);
-            if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
+            var user = await _userRepository.GetUserByEmailAsync(forgotPasswordModel.Email);
+            if (user == null || !user.EmailConfirmed)
             {
                 _logger.LogInformation($"Password reset request for unconfirmed or non-existent user {forgotPasswordModel.Email}.");
                 await _securityLogService.LogSecurityEvent(ipAddress, forgotPasswordModel.Email, "ForgotPassword", "Unconfirmed or non-existent email");
                 return Ok(new Response { IsSuccess = true, Message = "If your email is registered and confirmed, you will receive a reset link.", Status = ApiCode.Success });
             }
 
-            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            // **Update the Reset Link to Point to the Client Application**
+            var resetToken = await _authenticationService.GeneratePasswordResetTokenAsync(user);
             var clientResetLink = $"{_configuration["ClientApp:BaseUrl"]}/ResetPassword?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(forgotPasswordModel.Email)}";
 
             var message = new Message(
-                forgotPasswordModel.Email! ,
+                forgotPasswordModel.Email!,
                 "Password Reset Request",
                 $"Please reset your password by clicking this link: {clientResetLink}"
             );
@@ -449,58 +316,33 @@ namespace Access.Controllers
             {
                 _logger.LogWarning("Invalid reset password attempt.");
                 await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid Input Data");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData});
+                return BadRequest(new Response { IsSuccess = false, Message = "Invalid input data", Status = ApiCode.InvalidInputData });
             }
+
 #if !DEMO
             if (!resetPasswordModel.Email.EndsWith(_configuration["ClientDomain:Domain"], StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning("Email it´s not from keydevteam.com");
+                _logger.LogWarning("Email it´s not from domain");
                 await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Invalid domain");
                 return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.InvalidInputData });
             }
 #endif
-            var user = await _userManager.FindByEmailAsync(resetPasswordModel.Email);
-            if (user == null)
+            var result = await _authenticationService.ResetPasswordAsync(resetPasswordModel.Email, resetPasswordModel.Token, resetPasswordModel.NewPassword);
+            if (!result)
             {
-                _logger.LogWarning($"Reset password attempt for non-existent email {resetPasswordModel.Email}.");
-                await _securityLogService.LogSecurityEvent(ipAddress, resetPasswordModel.Email, "ResetPassword", "Email does not exist");
-                return BadRequest(new Response { IsSuccess = false, Message = "Invalid email", Status = ApiCode.EmailNotFound });
-            }
-
-            var resetPassResult = await _userManager.ResetPasswordAsync(user, resetPasswordModel.Token, resetPasswordModel.NewPassword);
-            if (!resetPassResult.Succeeded)
-            {
-                var errors = string.Join(", ", resetPassResult.Errors.Select(e => e.Description));
-                _logger.LogWarning($"Failed password reset for {resetPasswordModel.Email}. Errors: {errors}");
-                return BadRequest(new Response { IsSuccess = false, Message = $"Error resetting password: {errors}" , Status = ApiCode.FailedResetPassword });
+                _logger.LogWarning($"Failed password reset for {resetPasswordModel.Email}.");
+                return BadRequest(new Response { IsSuccess = false, Message = "Error resetting password", Status = ApiCode.FailedResetPassword });
             }
 
             _logger.LogInformation($"Password reset successfully for {resetPasswordModel.Email}.");
             return Ok(new Response { IsSuccess = true, Message = "Password has been reset successfully.", Status = ApiCode.Success });
         }
 
-        //[HttpPost]
-        //[Route("Refresh-Token")]
-        //public async Task<IActionResult> RefreshToken(LoginResponse tokens)
-        //{
-        //    var jwt = await _user.RenewAccessTokenAsync(tokens);
-        //    if (jwt.IsSuccess)
-        //    {
-        //        _logger.LogInformation($"Token refreshed successfully for {tokens.Username}.");
-        //        return Ok(new Response { Result = jwt, IsSuccess = true, Message = "Token refreshed successfully.", Status = ApiCode.Success });
-        //    }
-
-        //    _logger.LogWarning($"Failed token refresh attempt for {tokens.Username}.");
-        //    return Unauthorized(new Response { Status = ApiCode.RefreshTokenExpired, IsSuccess = false, Message = "Invalid token or refresh token." });
-        //}
-
-
         [HttpGet]
         [Route("ValidateToken")]
         public async Task<IActionResult> ValidateToken()
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-
             var authHeader = Request.Headers["Authorization"].ToString();
             if (string.IsNullOrEmpty(authHeader))
             {
@@ -521,7 +363,7 @@ namespace Access.Controllers
                     ValidateAudience = true,
                     ValidIssuer = _configuration["JWT:ValidIssuer"],
                     ValidAudience = _configuration["JWT:ValidAudience"],
-                    ValidateLifetime = true, // Enforce expiration check
+                    ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 };
 
@@ -535,7 +377,13 @@ namespace Access.Controllers
             }
         }
 
-
-        
+        private async Task<string> GenerateEmailConfirmationToken(ApplicationUser user)
+        {
+            var tokenData = $"{user.Id}_{user.Email}_{DateTime.UtcNow.Ticks}";
+            var tokenBytes = Encoding.UTF8.GetBytes(tokenData);
+            var token = Convert.ToBase64String(tokenBytes);
+            await _userRepository.SetAuthenticationTokenAsync(user.Id, "EmailConfirm", "Token", token);
+            return token;
+        }
     }
 }

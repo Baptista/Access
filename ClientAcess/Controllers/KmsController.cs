@@ -17,6 +17,12 @@ namespace ClientAcess.Controllers
         }
         public async Task<IActionResult> Index()
         {
+            var viewModel2 = new KmsModel
+            {
+                Year = DateTime.Now.Year,
+                Month = DateTime.Now.Month
+            };
+            return View(viewModel2);
             Request.Cookies.TryGetValue("jwtToken", out var token);
             if (!string.IsNullOrEmpty(token))
             {
@@ -104,25 +110,26 @@ namespace ClientAcess.Controllers
                     // Add header information
                     PdfPTable headerTable = new PdfPTable(2);
                     headerTable.WidthPercentage = 100;
+                    headerTable.SpacingBefore = 20f;
                     headerTable.SetWidths(new float[] { 2f, 1f });
 
                     // Left side: Company name and VAT
-                    PdfPCell leftCell = new PdfPCell(new Phrase("KeyDevTeam Unipessoal Lda 517824370", FontFactory.GetFont(FontFactory.HELVETICA, 10)));
-                    leftCell.Border = Rectangle.NO_BORDER;
+                    PdfPCell leftCell = new PdfPCell(new Phrase("Company: KeyDevTeam Unipessoal Lda  NIPC:517824370", FontFactory.GetFont(FontFactory.HELVETICA, 12)));
+                    leftCell.Border = Rectangle.NO_BORDER;                    
                     leftCell.HorizontalAlignment = Element.ALIGN_LEFT;
                     headerTable.AddCell(leftCell);
 
                     // Right side: Year and Month
-                    PdfPCell rightCell = new PdfPCell(new Phrase($"{request.Year} - {new DateTime(request.Year, request.Month, 1):MMMM}", FontFactory.GetFont(FontFactory.HELVETICA, 10)));
+                    PdfPCell rightCell = new PdfPCell(new Phrase($"{request.Year} - {new DateTime(request.Year, request.Month, 1):MMMM}", FontFactory.GetFont(FontFactory.HELVETICA, 12)));
                     rightCell.Border = Rectangle.NO_BORDER;
                     rightCell.HorizontalAlignment = Element.ALIGN_RIGHT;
                     headerTable.AddCell(rightCell);
 
-                    //document.Add(headerTable);
+                    document.Add(headerTable);
 
                     // Add employee name
-                    Font nameFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 14);
-                    Paragraph nameParagraph = new Paragraph(request.Name, nameFont);
+                    Font nameFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12);
+                    Paragraph nameParagraph = new Paragraph("Name: Bruno Filipe Pereira Baptista  NIF:228750911"/*request.Name*/, nameFont);
                     nameParagraph.Alignment = Element.ALIGN_CENTER;
                     nameParagraph.SpacingBefore = 10f;
                     nameParagraph.SpacingAfter = 10f;
@@ -130,7 +137,7 @@ namespace ClientAcess.Controllers
 
                     // Add license plate
                     Font licensePlateFont = FontFactory.GetFont(FontFactory.HELVETICA, 12);
-                    Paragraph licensePlateParagraph = new Paragraph($"License Plate: {request.LicensePlate}", licensePlateFont);
+                    Paragraph licensePlateParagraph = new Paragraph($"License Plate: {"85-XI-66"/*request.LicensePlate*/}", licensePlateFont);
                     licensePlateParagraph.Alignment = Element.ALIGN_CENTER;
                     licensePlateParagraph.SpacingAfter = 20f;
                     document.Add(licensePlateParagraph);
@@ -175,6 +182,12 @@ namespace ClientAcess.Controllers
                     totalKmsText.SpacingAfter = 20f;
                     document.Add(totalKmsText);
 
+                    // Add total kms for the month
+                    Paragraph totalValueKmsText = new Paragraph($"Received value (base 0.40€): {totalKms*0.4}€", FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12));
+                    totalValueKmsText.Alignment = Element.ALIGN_RIGHT;                    
+                    totalValueKmsText.SpacingAfter = 20f;
+                    document.Add(totalValueKmsText);
+
                     // Add signature lines
                     PdfPTable signatureTable = new PdfPTable(2);
                     signatureTable.WidthPercentage = 100;
@@ -188,11 +201,11 @@ namespace ClientAcess.Controllers
                     employeeSignatureCell.Border = Rectangle.NO_BORDER;
                     signatureTable.AddCell(employeeSignatureCell);
 
-                    // Manager signature
+                    //Manager signature
                     PdfPCell managerSignatureCell = new PdfPCell();
-                    managerSignatureCell.AddElement(new Paragraph("_______________________", FontFactory.GetFont(FontFactory.HELVETICA, 12)));
-                    managerSignatureCell.AddElement(new Paragraph("Manager Signature", FontFactory.GetFont(FontFactory.HELVETICA, 10)));
-                    managerSignatureCell.HorizontalAlignment = Element.ALIGN_RIGHT;
+                    //managerSignatureCell.AddElement(new Paragraph("_______________________", FontFactory.GetFont(FontFactory.HELVETICA, 12)));
+                    //managerSignatureCell.AddElement(new Paragraph("Manager Signature", FontFactory.GetFont(FontFactory.HELVETICA, 10)));
+                    //managerSignatureCell.HorizontalAlignment = Element.ALIGN_RIGHT;
                     managerSignatureCell.Border = Rectangle.NO_BORDER;
                     signatureTable.AddCell(managerSignatureCell);
 

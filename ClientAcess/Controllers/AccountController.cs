@@ -85,6 +85,7 @@ namespace ClientAcess.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Login() {
+            
             Request.Cookies.TryGetValue("jwtToken", out var token);
             if (!string.IsNullOrEmpty(token))            
             {
