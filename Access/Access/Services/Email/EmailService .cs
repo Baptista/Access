@@ -62,12 +62,12 @@ namespace Access.Services.Email
             AlternateView avHtml = AlternateView.CreateAlternateViewFromString(GetHtmlBody(message.Content), null, "text/html");
 
             // Caminho físico da imagem no disco
-            var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "assets", "img", "logo.png");
-            var logoResource = new LinkedResource(logoPath, "image/png")
-            {
-                ContentId = "logoImage"
-            };
-            avHtml.LinkedResources.Add(logoResource);
+            //var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "assets", "img", "logo.png");
+            //var logoResource = new LinkedResource(logoPath, "image/png")
+            //{
+            //    ContentId = "logoImage"
+            //};
+            //avHtml.LinkedResources.Add(logoResource);
 
             emailMessage.AlternateViews.Add(avHtml);
 
