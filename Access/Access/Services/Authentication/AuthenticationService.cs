@@ -21,27 +21,43 @@ namespace Access.Services.Authentication
             _logger = logger;
         }
 
+
+
+
         public async Task<bool> ConfirmEmailAsync(string email, string token)
         {
             var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null)
+            if (user == null) return false;
+
+            var storedTokenData = await _userRepository.GetAuthenticationTokenAsync(
+                user.Id, "EmailConfirm", "Token");
+
+            if (string.IsNullOrEmpty(storedTokenData)) return false;
+
+            var parts = storedTokenData.Split(':');
+            if (parts.Length != 2) return false;
+
+            var storedToken = parts[0];
+            var expiryTicks = long.Parse(parts[1]);
+            var expiry = new DateTime(expiryTicks);
+
+            if (DateTime.UtcNow > expiry || storedToken != token)
             {
+                await _userRepository.RemoveAuthenticationTokenAsync(
+                    user.Id, "EmailConfirm", "Token");
                 return false;
             }
 
-            // Validate token (simplified - in production use proper token validation)
-            var expectedTokenData = $"{user.Id}_{user.Email}_";
-            var tokenBytes = Convert.FromBase64String(token);
-            var tokenData = System.Text.Encoding.UTF8.GetString(tokenBytes);
-
-            if (!tokenData.StartsWith(expectedTokenData))
+            var result = await _userRepository.ConfirmEmailAsync(user.Id);
+            if (result)
             {
-                return false;
+                await _userRepository.RemoveAuthenticationTokenAsync(
+                    user.Id, "EmailConfirm", "Token");
             }
-
-            return await _userRepository.ConfirmEmailAsync(user.Id);
+            return result;
         }
 
+        
         public async Task<ApplicationUser> ValidateUserAsync(string userName, string password)
         {
             var user = await _userRepository.GetUserByUserNameAsync(userName);
