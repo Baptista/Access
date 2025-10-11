@@ -1,6 +1,7 @@
 ﻿using Access.Data;
 using Access.DataAccess;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 
 namespace Access.Services.Authentication
 {
@@ -10,107 +11,170 @@ namespace Access.Services.Authentication
         private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
         private readonly ILogger<AuthenticationService> _logger;
+        private readonly string _connectionString;
 
         public AuthenticationService(
             IUserRepository userRepository,
             IPasswordHasher<ApplicationUser> passwordHasher,
-            ILogger<AuthenticationService> logger)
+            ILogger<AuthenticationService> logger,
+            IConfiguration configuration)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _logger = logger;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
-
-
-
 
         public async Task<bool> ConfirmEmailAsync(string email, string token)
         {
-            var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null) return false;
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
 
-            var storedTokenData = await _userRepository.GetAuthenticationTokenAsync(
-                user.Id, "EmailConfirm", "Token");
+            using var transaction = connection.BeginTransaction();
 
-            if (string.IsNullOrEmpty(storedTokenData)) return false;
-
-            var parts = storedTokenData.Split(':');
-            if (parts.Length != 2) return false;
-
-            var storedToken = parts[0];
-            var expiryTicks = long.Parse(parts[1]);
-            var expiry = new DateTime(expiryTicks);
-
-            if (DateTime.UtcNow > expiry || storedToken != token)
+            try
             {
-                await _userRepository.RemoveAuthenticationTokenAsync(
-                    user.Id, "EmailConfirm", "Token");
+                var user = await _userRepository.GetUserByEmailAsync(email, connection, transaction);
+                if (user == null)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                // Validate token
+                var expectedTokenData = $"{user.Id}_{user.Email}_";
+                var tokenBytes = Convert.FromBase64String(token);
+                var tokenData = System.Text.Encoding.UTF8.GetString(tokenBytes);
+
+                if (!tokenData.StartsWith(expectedTokenData))
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                var result = await _userRepository.ConfirmEmailAsync(user.Id, connection, transaction);
+
+                if (result)
+                {
+                    // Remove confirmation token after successful confirmation
+                    await _userRepository.RemoveAuthenticationTokenAsync(user.Id, "EmailConfirm", "Token", connection, transaction);
+                    transaction.Commit();
+                    return true;
+                }
+
+                transaction.Rollback();
                 return false;
             }
-
-            var result = await _userRepository.ConfirmEmailAsync(user.Id);
-            if (result)
+            catch (Exception ex)
             {
-                await _userRepository.RemoveAuthenticationTokenAsync(
-                    user.Id, "EmailConfirm", "Token");
+                transaction.Rollback();
+                _logger.LogError(ex, "Error confirming email");
+                throw;
             }
-            return result;
         }
 
-        
         public async Task<ApplicationUser> ValidateUserAsync(string userName, string password)
         {
-            var user = await _userRepository.GetUserByUserNameAsync(userName);
-            if (user == null)
-            {
-                return null;
-            }
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
 
-            var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-            return result == PasswordVerificationResult.Success ? user : null;
+            try
+            {
+                var user = await _userRepository.GetUserByUserNameAsync(userName, connection);
+                if (user == null)
+                {
+                    return null;
+                }
+
+                var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+                return result == PasswordVerificationResult.Success ? user : null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating user");
+                throw;
+            }
         }
 
         public async Task<string> GeneratePasswordResetTokenAsync(ApplicationUser user)
         {
-            // Generate reset token
-            var tokenData = $"RESET_{user.Id}_{user.Email}_{DateTime.UtcNow.Ticks}";
-            var tokenBytes = System.Text.Encoding.UTF8.GetBytes(tokenData);
-            var token = Convert.ToBase64String(tokenBytes);
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
 
-            // Store token for validation
-            await _userRepository.SetAuthenticationTokenAsync(user.Id, "PasswordReset", "Token", token);
+            using var transaction = connection.BeginTransaction();
 
-            return token;
+            try
+            {
+                // Generate reset token
+                var tokenData = $"RESET_{user.Id}_{user.Email}_{DateTime.UtcNow.Ticks}";
+                var tokenBytes = System.Text.Encoding.UTF8.GetBytes(tokenData);
+                var token = Convert.ToBase64String(tokenBytes);
+
+                // Store token for validation
+                await _userRepository.SetAuthenticationTokenAsync(user.Id, "PasswordReset", "Token", token, connection, transaction);
+
+                transaction.Commit();
+                return token;
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                _logger.LogError(ex, "Error generating password reset token");
+                throw;
+            }
         }
 
         public async Task<bool> ResetPasswordAsync(string email, string token, string newPassword)
         {
-            var user = await _userRepository.GetUserByEmailAsync(email);
-            if (user == null)
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            using var transaction = connection.BeginTransaction();
+
+            try
             {
+                var user = await _userRepository.GetUserByEmailAsync(email, connection, transaction);
+                if (user == null)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                // Validate token
+                var storedToken = await _userRepository.GetAuthenticationTokenAsync(user.Id, "PasswordReset", "Token", connection, transaction);
+                if (string.IsNullOrEmpty(storedToken) || storedToken != token)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                // Hash new password
+                var newPasswordHash = _passwordHasher.HashPassword(user, newPassword);
+
+                // Update password
+                var result = await _userRepository.UpdatePasswordHashAsync(user.Id, newPasswordHash, connection, transaction);
+
+                if (result)
+                {
+                    // Remove the reset token
+                    await _userRepository.RemoveAuthenticationTokenAsync(user.Id, "PasswordReset", "Token", connection, transaction);
+
+                    // Reset failed login attempts
+                    await _userRepository.ResetAccessFailedCountAsync(user.Id, connection, transaction);
+
+                    transaction.Commit();
+                    return true;
+                }
+
+                transaction.Rollback();
                 return false;
             }
-
-            // Validate token
-            var storedToken = await _userRepository.GetAuthenticationTokenAsync(user.Id, "PasswordReset", "Token");
-            if (string.IsNullOrEmpty(storedToken) || storedToken != token)
+            catch (Exception ex)
             {
-                return false;
+                transaction.Rollback();
+                _logger.LogError(ex, "Error resetting password");
+                throw;
             }
-
-            // Hash new password
-            var newPasswordHash = _passwordHasher.HashPassword(user, newPassword);
-
-            // Update password
-            var result = await _userRepository.UpdatePasswordHashAsync(user.Id, newPasswordHash);
-
-            if (result)
-            {
-                // Remove the reset token
-                await _userRepository.RemoveAuthenticationTokenAsync(user.Id, "PasswordReset", "Token");
-            }
-
-            return result;
         }
     }
 

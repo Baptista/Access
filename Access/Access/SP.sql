@@ -715,3 +715,39 @@ BEGIN
     SELECT @@ROWCOUNT AS ClearedCount;
 END;
 GO
+
+
+-- sp_AddUserToRole - Add user to a role
+IF OBJECT_ID('dbo.sp_AddUserToRole', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_AddUserToRole;
+GO
+CREATE PROCEDURE dbo.sp_AddUserToRole
+    @UserId NVARCHAR(450),
+    @RoleId NVARCHAR(450)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Check if the user-role relationship already exists
+    IF EXISTS (SELECT 1 FROM dbo.AspNetUserRoles 
+               WHERE UserId = @UserId AND RoleId = @RoleId)
+    BEGIN
+        -- Already exists, return 0 (false)
+        SELECT 0 AS Result;
+        RETURN;
+    END
+    
+    BEGIN TRY
+        -- Insert the user-role relationship
+        INSERT INTO dbo.AspNetUserRoles (UserId, RoleId)
+        VALUES (@UserId, @RoleId);
+        
+        -- Return 1 (true) for success
+        SELECT 1 AS Result;
+    END TRY
+    BEGIN CATCH
+        -- Return 0 (false) for failure
+        SELECT 0 AS Result;
+    END CATCH
+END;
+GO
